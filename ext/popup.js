@@ -87,7 +87,7 @@
   function renderResults(cards, q) {
     els.results.innerHTML = '';
     if (!cards.length) {
-      els.results.innerHTML = '<div class="res-note">No cards found for "' + q + '".</div>';
+      els.results.innerHTML = '<div class="res-note">No cards found for "' + esc(q) + '".</div>';
       return;
     }
     cards.forEach(function (c) {
@@ -147,7 +147,10 @@
     state.watch.unshift({
       id: c.id, name: c.name, set: c.set, number: c.number, image: c.image,
       price: c.price, variant: c.variant, trend: null, updatedAt: '', tcgplayerUrl: c.tcgplayerUrl,
-      ts: null
+      // Seed ts from the search result: the price shown is real and fresh, so
+      // a failed quote refresh degrades to the staleness path ("quotes from
+      // just now") instead of a red error.
+      ts: Date.now()
     });
     save();
     render();
@@ -291,7 +294,6 @@
     var trend = document.createElement('div');
     trend.className = 'card-trend' + (w.trend ? (w.trend.dir === 1 ? ' up' : ' down') : ' flat');
     trend.textContent = w.trend ? '▲ ' + Poke.formatTrend(w.trend) : '—';
-    if (!w.trend) trend.textContent = '—';
     quote.appendChild(price);
     quote.appendChild(trend);
 
