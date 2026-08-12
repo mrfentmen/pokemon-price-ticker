@@ -38,10 +38,17 @@ body {
   background: var(--card); color: var(--text); font-size: 17px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
+  position: relative;
 }
 .icon-btn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(56, 189, 248, 0.3); }
 .icon-btn:active { transform: scale(0.94); }
 .icon-btn.spinning { animation: spin 0.7s linear infinite; }
+.icon-btn::before {
+  content: ''; position: absolute; inset: -3px; border-radius: 12px;
+  background: conic-gradient(var(--accent) var(--progress, 0%), transparent var(--progress, 0%));
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.icon-btn.refreshing::before { opacity: 1; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------- ticker tape ---------- */
@@ -249,6 +256,7 @@ body.compact .card-row { padding-left: 5px !important; }
 .status-row { display: flex; align-items: center; margin: 8px 16px 0; gap: 4px; }
 .status-row .status { margin: 0; flex: 1; }
 .refresh-age { flex: none; font-size: 10px; color: var(--accent); font-weight: 700; white-space: nowrap; opacity: 0.8; }
+.undo-link { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; text-decoration: underline; padding: 0; }
 .retry-btn {
   flex: none; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
   background: var(--card); color: var(--accent);

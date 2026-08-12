@@ -38,6 +38,9 @@
   var ctxTarget = null;
   var focusIdx = -1;
   var lastRefreshTime = 0;
+  var lastRemoved = null;
+  var undoTimer = null;
+  var countdownTimer = null;
 
   var dragIdx = -1;
   var compact = false;
@@ -256,9 +259,27 @@
   }
 
   function removeCard(id) {
+    var removed = state.watch.find(function (w) { return w.id === id; });
+    if (!removed) return;
+    lastRemoved = removed;
     state.watch = state.watch.filter(function (w) { return w.id !== id; });
+    if (undoTimer) clearTimeout(undoTimer);
+    undoTimer = setTimeout(function () { lastRemoved = null; save(); }, 4000);
     save();
     render();
+    setStatus('Removed ' + removed.name + ' — <button id="undoRemove" class="undo-link">Undo</button>');
+    setTimeout(function () {
+      var btn = document.getElementById('undoRemove');
+      if (btn) btn.addEventListener('click', function () {
+        if (!lastRemoved) return;
+        state.watch.push(lastRemoved);
+        if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+        lastRemoved = null;
+        save();
+        render();
+        setStatus('Restored ' + removed.name + '.');
+      });
+    }, 10);
   }
 
   // Refresh a single card's quote (used right after adding).
@@ -954,6 +975,11 @@
       }
     }
     // ---- Ctrl/Cmd shortcuts ----
+    if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'r' || ev.key === 'R')) {
+      ev.preventDefault();
+      refreshAll();
+      return;
+    }
     if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')) {
       ev.preventDefault();
       els.search.focus();
@@ -1051,8 +1077,16 @@
   load(function () {
     render();
     if (state.watch.length) refreshAll();
+    var intervalStart = Date.now();
     setInterval(refreshAll, REFRESH_MS);
     setTimeout(function () { updateBadge(); }, 500);
     setInterval(updateRefreshAge, 10000);
+    // countdown ring on refresh button
+    countdownTimer = setInterval(function () {
+      var elapsed = Date.now() - intervalStart;
+      var pct = Math.min(100, (elapsed % REFRESH_MS) / REFRESH_MS * 100);
+      els.refresh.style.setProperty('--progress', pct + '%');
+      els.refresh.classList.add('refreshing');
+    }, 250);
   });
 })();
