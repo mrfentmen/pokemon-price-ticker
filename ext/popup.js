@@ -185,9 +185,13 @@
       })
       .catch(function (err) {
         if (myId !== searchId) return;
-        var msg = (err && err.status === 404) ? 'No cards found for "' + esc(q) + '".'
-          : 'The price feed is hiccuping — try again in a moment.';
-        els.results.innerHTML = '<div class="res-note">' + msg + '</div>';
+        if (err && err.status === 404) {
+          els.results.innerHTML = '<div class="res-note">No cards found for "' + esc(q) + '".</div>';
+        } else {
+          els.results.innerHTML = '';
+          els.results.hidden = true;
+          setStatus('Feed unavailable — try again', true);
+        }
       });
   }
 
@@ -258,11 +262,13 @@
       if (!ps) return;
       if (ps.searchText) {
         els.search.value = ps.searchText;
-        doSearch(ps.searchText);
       }
       if (ps.resultsOpen && ps.resultsHTML) {
         els.results.innerHTML = ps.resultsHTML;
         els.results.hidden = false;
+      } else if (ps.searchText && ps.searchText.length >= 2) {
+        // No cached results — do a fresh search quietly
+        doSearch(ps.searchText);
       }
       if (ps.scrollY) {
         setTimeout(function () { window.scrollTo(0, ps.scrollY); }, 50);
