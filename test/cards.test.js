@@ -149,3 +149,19 @@ test('offlineMsg and staleLevel match the family pattern', () => {
   assert.equal(Poke.staleLevel(now - 2 * 86400_000), 'stale-old');
   assert.equal(Poke.staleLevel(null), '');
 });
+
+test('sparkBars normalizes daily snapshots for the 30-day sparkline', () => {
+  const daily = [
+    { d: '2026-08-01', p: 100 },
+    { d: '2026-08-02', p: 200 },
+    { d: '2026-08-03', p: 50 }
+  ];
+  const bars = Poke.sparkBars(daily, 30);
+  assert.equal(bars.length, 3);
+  assert.equal(bars[1], 1); // 200/200
+  assert.equal(bars[0], 0.5);
+  assert.equal(bars[2], 0.25);
+  assert.ok(bars[2] >= 0.04); // floor
+  assert.equal(Poke.sparkBars([], 30).length, 0);
+  assert.equal(Poke.sparkBars(null, 30).length, 0);
+});

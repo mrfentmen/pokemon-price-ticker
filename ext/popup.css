@@ -138,8 +138,8 @@ body {
 .card-trend.up { color: var(--up); }
 .card-trend.down { color: var(--down); }
 .card-trend.flat { color: var(--muted); }
-.card-bars { display: flex; align-items: flex-end; gap: 2.5px; height: 18px; flex: none; }
-.card-bars .bar { width: 3.5px; border-radius: 2px; background: var(--accent); opacity: 0.75; }
+.card-bars { display: flex; align-items: flex-end; gap: 0.5px; height: 18px; flex: none; }
+.card-bars .bar { width: 1px; border-radius: 0; background: var(--accent); opacity: 0.75; }
 .row-x {
   flex: none; width: 22px; height: 22px; border: 0; border-radius: 6px;
   background: transparent; color: var(--muted); font-size: 11px; cursor: pointer;

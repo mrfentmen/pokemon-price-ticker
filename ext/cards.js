@@ -142,6 +142,17 @@
     return 'stale-old';
   }
 
+  // Normalized heights (0..1) for the last `n` daily price snapshots — the
+  // 30-day sparkline. Each snapshot is {d, p}.
+  function sparkBars(pts, n) {
+    n = n || 30;
+    if (!Array.isArray(pts) || !pts.length) return [];
+    var slice = pts.slice(-n).map(function (h) { return h.p; });
+    var max = Math.max.apply(null, slice);
+    if (!(max > 0)) return slice.map(function () { return 0; });
+    return slice.map(function (p) { return Math.max(0.04, p / max); });
+  }
+
   // Timeout + quiet retries with a growing backoff (the family resilience
   // pattern): retries only network errors and 5xx/429, never 4xx. The wait
   // before each retry is backoff * attempt-number (800ms, 1600ms, …) so a
@@ -189,6 +200,7 @@
     ageLabel: ageLabel,
     offlineMsg: offlineMsg,
     staleLevel: staleLevel,
+    sparkBars: sparkBars,
     fetchJson: fetchJson,
     UA: UA
   };

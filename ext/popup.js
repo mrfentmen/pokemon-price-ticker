@@ -64,7 +64,10 @@
     chrome.storage.local.get('ptWatchlist', function (d) {
       var w = d && d.ptWatchlist;
       if (Array.isArray(w)) {
-        state.watch = w.filter(function (c) { return c && c.id && c.name; });
+        state.watch = w.filter(function (c) { return c && c.id && c.name; }).map(function (c) {
+          if (!Array.isArray(c.daily)) c.daily = [];
+          return c;
+        });
       }
       if (cb) cb();
     });
@@ -254,6 +257,14 @@
     entry.cmAvg1 = q.cmAvg1; entry.cmAvg7 = q.cmAvg7; entry.cmAvg30 = q.cmAvg30;
     entry.ts = Date.now();
     if (crossed) flashAlert(entry);
+    // daily price snapshot (30-day sparkline — update today's entry or push a new day)
+    if (q.price != null) {
+      if (!entry.daily) entry.daily = [];
+      var today = new Date().toISOString().slice(0, 10);
+      var last = entry.daily.length ? entry.daily[entry.daily.length - 1] : null;
+      if (last && last.d === today) { last.p = q.price; }
+      else { entry.daily.push({ d: today, p: q.price }); if (entry.daily.length > 30) entry.daily = entry.daily.slice(-30); }
+    }
     save();
     render();
   }
@@ -317,14 +328,18 @@
 
     var bars = document.createElement('div');
     bars.className = 'card-bars';
-    bars.title = '1d · 7d · 30d sale averages';
-    [w.cmAvg1, w.cmAvg7, w.cmAvg30].forEach(function (v) {
-      var b = document.createElement('span');
-      b.className = 'bar';
-      if (v != null) b.style.height = Math.max(3, Math.round((v / Math.max(w.cmAvg1, w.cmAvg7, w.cmAvg30)) * 16)) + 'px';
-      bars.appendChild(b);
-    });
-    if (!w.cmAvg1 && !w.cmAvg7 && !w.cmAvg30) bars.title = '';
+    bars.title = '30-day price sparkline';
+    var heights = Poke.sparkBars(w.daily, 30);
+    if (heights.length) {
+      heights.forEach(function (v) {
+        var b = document.createElement('span');
+        b.className = 'bar';
+        b.style.height = Math.round(v * 16) + 'px';
+        bars.appendChild(b);
+      });
+    } else {
+      bars.title = '';
+    }
 
     var x = document.createElement('button');
     x.className = 'row-x';
