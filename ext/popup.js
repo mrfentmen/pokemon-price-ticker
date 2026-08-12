@@ -2,10 +2,10 @@
 /* global Poke, chrome */
 
 (function () {
-  var REFRESH_MS = 60 * 1000; // auto-refresh quotes while the popup is open
+  var REFRESH_MS = 60 * 1000;
 
   var state = {
-    watch: [],   // {id, name, set, number, image, price, variant, trend, updatedAt, tcgplayerUrl, ts}
+    watch: [],
     loading: false,
     snoozeUntil: 0
   };
@@ -44,9 +44,10 @@
   var lastRemoved = null;
   var undoTimer = null;
   var countdownTimer = null;
-
   var dragIdx = -1;
   var compact = false;
+  var expandedId = null;
+  var expandedRange = {};
 
   var chimeCtx = null;
   function chime() {
@@ -61,7 +62,7 @@
       g.gain.exponentialRampToValueAtTime(0.001, chimeCtx.currentTime + 0.3);
       o.connect(g); g.connect(chimeCtx.destination);
       o.start(chimeCtx.currentTime); o.stop(chimeCtx.currentTime + 0.3);
-    } catch (_) { /* audio not available */ }
+    } catch (_) {}
   }
 
   var hintTimer = null;
@@ -89,7 +90,6 @@
     if (!Array.isArray(entry.alertLog)) entry.alertLog = [];
     var threshold = dir === 'above' ? entry.alertAbove : entry.alertBelow;
     var verb = dir === 'above' ? 'hit' : 'dropped below';
-    // percentage alert fallback
     if (threshold == null && entry.alertPct) { threshold = entry.alertPct; verb = 'moved ±' + entry.alertPct + '% from'; }
     entry.alertLog.push({ ts: Date.now(), dir: dir, threshold: threshold, price: entry.price, name: entry.name });
     if (entry.alertLog.length > 50) entry.alertLog = entry.alertLog.slice(-50);
@@ -162,15 +162,10 @@
 
   function doSearch(query) {
     var q = query.trim();
-    if (q.length < 2) {
-      els.results.hidden = true;
-      return;
-    }
+    if (q.length < 2) { els.results.hidden = true; return; }
     var myId = ++searchId;
     els.results.innerHTML = '<div class="res-note">Searching…</div>';
     els.results.hidden = false;
-    // Three tries with a growing backoff: the feed can flap, and one retry
-    // is not always enough to ride out a bad patch.
     Poke.fetchJson(Poke.searchUrl(q), { tries: 3, backoff: 700 })
       .then(function (json) {
         if (myId !== searchId) return;
@@ -180,8 +175,6 @@
       })
       .catch(function (err) {
         if (myId !== searchId) return;
-        // A network/5xx failure means the feed is down — the card name is
-        // probably fine. Only a 4xx (or an empty parse) means "not found".
         var feedProblem = !err || !err.status || err.status === 429 || err.status >= 500;
         els.results.innerHTML = feedProblem
           ? '<div class="res-note">The price feed is hiccuping — try again in a moment.</div>'
@@ -197,29 +190,19 @@
     }
     cards.forEach(function (c) {
       var row = document.createElement('button');
-      row.type = 'button';
-      row.className = 'res-row';
+      row.type = 'button'; row.className = 'res-row';
       var thumb = document.createElement('img');
-      thumb.className = 'res-thumb';
-      thumb.alt = '';
-      thumb.src = c.image;
+      thumb.className = 'res-thumb'; thumb.alt = ''; thumb.src = c.image;
       thumb.addEventListener('error', function () { thumb.remove(); });
-      var body = document.createElement('span');
-      body.className = 'res-body';
-      var name = document.createElement('span');
-      name.className = 'res-name';
+      var body = document.createElement('span'); body.className = 'res-body';
+      var name = document.createElement('span'); name.className = 'res-name';
       name.textContent = c.name + (c.number ? ' · ' + c.number : '');
-      var set = document.createElement('span');
-      set.className = 'res-set';
+      var set = document.createElement('span'); set.className = 'res-set';
       set.textContent = c.set || '';
-      body.appendChild(name);
-      body.appendChild(set);
-      var price = document.createElement('span');
-      price.className = 'res-price';
+      body.appendChild(name); body.appendChild(set);
+      var price = document.createElement('span'); price.className = 'res-price';
       price.textContent = c.price != null ? Poke.formatPrice(c.price) : '—';
-      row.appendChild(thumb);
-      row.appendChild(body);
-      row.appendChild(price);
+      row.appendChild(thumb); row.appendChild(body); row.appendChild(price);
       row.addEventListener('click', function () {
         addCard(c);
         els.results.hidden = true;
@@ -245,21 +228,13 @@
   // ---------- watchlist ----------
   function addCard(c) {
     var existing = state.watch.some(function (w) { return w.id === c.id; });
-    if (existing) {
-      setStatus('Already on your ticker.');
-      return;
-    }
+    if (existing) { setStatus('Already on your ticker.'); return; }
     state.watch.unshift({
       id: c.id, name: c.name, set: c.set, number: c.number, image: c.image,
       price: c.price, variant: c.variant, trend: null, updatedAt: '', tcgplayerUrl: c.tcgplayerUrl,
-      // Seed ts from the search result: the price shown is real and fresh, so
-      // a failed quote refresh degrades to the staleness path ("quotes from
-      // just now") instead of a red error.
       ts: Date.now()
     });
-    save();
-    render();
-    refreshCard(state.watch[0]);
+    save(); render(); refreshCard(state.watch[0]);
   }
 
   function removeCard(id) {
@@ -269,8 +244,7 @@
     state.watch = state.watch.filter(function (w) { return w.id !== id; });
     if (undoTimer) clearTimeout(undoTimer);
     undoTimer = setTimeout(function () { lastRemoved = null; save(); }, 4000);
-    save();
-    render();
+    save(); render();
     setStatus('Removed ' + removed.name + ' — <button id="undoRemove" class="undo-link">Undo</button>');
     setTimeout(function () {
       var btn = document.getElementById('undoRemove');
@@ -278,35 +252,25 @@
         if (!lastRemoved) return;
         state.watch.push(lastRemoved);
         if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
-        lastRemoved = null;
-        save();
-        render();
+        lastRemoved = null; save(); render();
         setStatus('Restored ' + removed.name + '.');
       });
     }, 10);
   }
 
-  // Refresh a single card's quote (used right after adding).
   function refreshCard(entry) {
     var myId = ++refreshId;
-    // Same 3-try ladder as search: quotes are the core of the ticker.
     Poke.fetchJson(Poke.cardUrl(entry.id), { tries: 3, backoff: 700 })
       .then(function (json) {
         if (myId !== refreshId) return;
         var q = Poke.parseQuote(json);
         if (!q) throw new Error('bad payload');
-        applyQuote(entry.id, q);
-        setStatus('');
+        applyQuote(entry.id, q); setStatus('');
       })
       .catch(function () {
         if (myId !== refreshId) return;
-        // keep the search-list price; say so honestly
-        if (entry.ts) {
-          setStatus(Poke.offlineMsg(entry.ts));
-          setStale(entry.ts);
-        } else {
-          setStatus('Could not fetch a quote for ' + entry.name + '.', true);
-        }
+        if (entry.ts) { setStatus(Poke.offlineMsg(entry.ts)); setStale(entry.ts); }
+        else { setStatus('Could not fetch a quote for ' + entry.name + '.', true); }
       });
   }
 
@@ -323,28 +287,18 @@
           var q = Poke.parseQuote(json);
           if (q) { applyQuote(entry.id, q); succeeded++; }
         })
-        .catch(function () { /* per-card failure keeps the cached quote */ })
+        .catch(function () {})
         .finally(function () {
           if (myId !== refreshId) return;
           pending--;
           if (pending > 0) return;
           els.refresh.classList.remove('spinning');
-          if (succeeded > 0) {
-            setStatus('');
-            lastRefreshTime = Date.now();
-            updateRefreshAge();
-          } else {
-            // everything failed: fall back to cached quotes with their age
+          if (succeeded > 0) { setStatus(''); lastRefreshTime = Date.now(); updateRefreshAge(); }
+          else {
             var oldest = null;
-            state.watch.forEach(function (w) {
-              if (w.ts && (oldest === null || w.ts < oldest)) oldest = w.ts;
-            });
-            if (oldest) {
-              setStatus(Poke.offlineMsg(oldest));
-              setStale(oldest);
-            } else {
-              setStatus('Could not reach the price feed. Check your connection.', true);
-            }
+            state.watch.forEach(function (w) { if (w.ts && (oldest === null || w.ts < oldest)) oldest = w.ts; });
+            if (oldest) { setStatus(Poke.offlineMsg(oldest)); setStale(oldest); }
+            else { setStatus('Could not reach the price feed. Check your connection.', true); }
           }
         });
     });
@@ -354,22 +308,15 @@
     var entry = state.watch.find(function (w) { return w.id === id; });
     if (!entry) return;
     var oldPrice = entry.price;
-    var crossedAbove = entry.alertAbove != null && oldPrice != null &&
-      oldPrice < entry.alertAbove && q.price != null && q.price >= entry.alertAbove;
-    var crossedBelow = entry.alertBelow != null && oldPrice != null &&
-      oldPrice > entry.alertBelow && q.price != null && q.price <= entry.alertBelow;
-    var priceChanged = oldPrice != null && q.price != null && oldPrice !== q.price;
-    entry.price = q.price;
-    entry.variant = q.variant;
-    entry.trend = q.trend;
-    entry.updatedAt = q.updatedAt;
-    entry.tcgplayerUrl = q.tcgplayerUrl;
+    var crossedAbove = entry.alertAbove != null && oldPrice != null && oldPrice < entry.alertAbove && q.price != null && q.price >= entry.alertAbove;
+    var crossedBelow = entry.alertBelow != null && oldPrice != null && oldPrice > entry.alertBelow && q.price != null && q.price <= entry.alertBelow;
+    entry.price = q.price; entry.variant = q.variant; entry.trend = q.trend;
+    entry.updatedAt = q.updatedAt; entry.tcgplayerUrl = q.tcgplayerUrl;
     entry.image = q.image || entry.image;
     entry.cmAvg1 = q.cmAvg1; entry.cmAvg7 = q.cmAvg7; entry.cmAvg30 = q.cmAvg30;
     entry.ts = Date.now();
     if (crossedAbove) { flashAlert(entry, 'above'); chime(); updateBadge(); }
     if (crossedBelow) { flashAlert(entry, 'below'); chime(); updateBadge(); }
-    // percentage-based alert crossing
     if (entry.alertPct && entry.alertPctBase != null && oldPrice != null && q.price != null) {
       var pctChange = Math.abs(q.price - entry.alertPctBase) / entry.alertPctBase * 100;
       var prevPct = Math.abs(oldPrice - entry.alertPctBase) / entry.alertPctBase * 100;
@@ -377,7 +324,6 @@
         flashAlert(entry, q.price >= entry.alertPctBase ? 'above' : 'below'); chime();
       }
     }
-    // daily price snapshot (30-day sparkline — update today's entry or push a new day)
     if (q.price != null) {
       if (!entry.daily) entry.daily = [];
       var today = new Date().toISOString().slice(0, 10);
@@ -385,9 +331,7 @@
       if (last && last.d === today) { last.p = q.price; }
       else { entry.daily.push({ d: today, p: q.price }); if (entry.daily.length > 30) entry.daily = entry.daily.slice(-30); }
     }
-    save();
-    render();
-    // flash the price element after render
+    save(); render();
     if (oldPrice != null && q.price != null && oldPrice !== q.price) {
       setTimeout(function () {
         var rows = els.list.querySelectorAll('.card-row');
@@ -407,6 +351,10 @@
 
   // ---------- rendering ----------
   function render() {
+    // preserve expansion state across re-renders
+    var prevExpanded = expandedId;
+    expandedId = null;
+
     els.empty.hidden = state.watch.length > 0;
     els.tapeWrap.hidden = state.watch.length === 0;
     els.clearAll.hidden = state.watch.length === 0;
@@ -414,15 +362,13 @@
     els.copyClip.hidden = state.watch.length === 0;
     els.copyAll.hidden = state.watch.length === 0;
     renderTape();
-    // portfolio total
     var sum = 0; var priced = 0;
     state.watch.forEach(function (w) { if (w.price != null) { sum += w.price; priced++; } });
-    // portfolio 24h change
     var daySum = 0;
     state.watch.forEach(function (w) { var d = dayChange(w); if (d != null) daySum += d; });
     var dayStr = daySum !== 0 ? (' <span class="portfolio-day ' + (daySum > 0 ? 'up' : 'down') + '">' + (daySum > 0 ? '+' : '') + '$' + Math.abs(daySum).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 24h</span>') : '';
     els.portfolio.innerHTML = (priced ? 'Total: $' + sum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' (' + priced + ' cards)' + dayStr : '');
-    // sort — favorites always on top, then sort within each group
+
     var sort = els.sortBy.value;
     var sorted = state.watch.slice();
     sorted.sort(function (a, b) { return (b.fav ? 1 : 0) - (a.fav ? 1 : 0); });
@@ -434,13 +380,52 @@
     else if (sort === 'trend-desc') rest.sort(function (a, b) { var ta = a.trend ? a.trend.pct : 0; var tb = b.trend ? b.trend.pct : 0; return tb - ta; });
     else if (sort === 'trend-asc') rest.sort(function (a, b) { var ta = a.trend ? a.trend.pct : 0; var tb = b.trend ? b.trend.pct : 0; return ta - tb; });
     sorted = favs.concat(rest);
+
     els.list.innerHTML = '';
     sorted.forEach(function (w) {
+      // restore expanded state
+      if (w.id === prevExpanded) expandedId = w.id;
       els.list.appendChild(rowFor(w));
     });
+
+    // if the previously expanded card still exists, draw its chart
+    if (expandedId) {
+      requestAnimationFrame(function () {
+        var wrap = els.list.querySelector('.card-wrap.expanded');
+        if (wrap) {
+          var canvas = wrap.querySelector('.price-chart');
+          var w = state.watch.find(function (x) { return x.id === expandedId; });
+          if (canvas && w) {
+            var range = expandedRange[expandedId] || '30d';
+            drawChart(canvas, w, range);
+            var tools = wrap.querySelector('.chart-tools');
+            if (tools) {
+              tools.querySelectorAll('button').forEach(function (b) {
+                b.classList.toggle('active', b.textContent.trim() === (range === '7d' ? '7d' : range === '30d' ? '30d' : 'All'));
+              });
+            }
+          }
+        }
+      });
+    }
   }
 
+  // ---------- Poké Ball placeholder ----------
+  function pokePlaceholder(size) {
+    var d = document.createElement('div');
+    d.className = size === 'big' ? 'expand-thumb ph' : 'card-thumb ph';
+    return d;
+  }
+
+  // ---------- accordion card row ----------
   function rowFor(w) {
+    var isExpanded = (expandedId === w.id);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'card-wrap';
+    if (isExpanded) wrap.classList.add('expanded');
+
+    // ---- collapsed row ----
     var row = document.createElement('article');
     row.className = 'card-row';
     row.tabIndex = 0;
@@ -449,271 +434,229 @@
     row._watchId = w.id;
 
     var thumb = document.createElement('img');
-    thumb.className = 'card-thumb';
-    thumb.alt = '';
-    thumb.loading = 'lazy';
-    thumb.src = w.image;
+    thumb.className = 'card-thumb'; thumb.alt = ''; thumb.loading = 'lazy'; thumb.src = w.image;
     thumb.addEventListener('error', function () {
-      thumb.remove();
-      row.insertBefore(thumbPlaceholder(), row.querySelector('.card-info') || row.firstChild);
+      thumb.replaceWith(pokePlaceholder('small'));
     });
 
-    var info = document.createElement('div');
-    info.className = 'card-info';
-    var name = document.createElement('div');
-    name.className = 'card-name';
-    name.textContent = w.name;
-    var set = document.createElement('div');
-    set.className = 'card-set';
-    set.textContent = w.set || '';
-    info.appendChild(name);
-    info.appendChild(set);
+    var info = document.createElement('div'); info.className = 'card-info';
+    var nameEl = document.createElement('div'); nameEl.className = 'card-name'; nameEl.textContent = w.name;
+    info.appendChild(nameEl);
 
-    var quote = document.createElement('div');
-    quote.className = 'card-quote';
-    var price = document.createElement('div');
-    price.className = 'card-price';
-    price.textContent = Poke.formatPrice(w.price);
+    var quote = document.createElement('div'); quote.className = 'card-quote';
+    var priceEl = document.createElement('div'); priceEl.className = 'card-price'; priceEl.textContent = Poke.formatPrice(w.price);
     if (w.variant) {
-      var v = document.createElement('span');
-      v.className = 'card-variant';
-      v.textContent = w.variant.replace(/([a-z])([A-Z])/g, '$1 $2').toUpperCase();
-      price.appendChild(v);
+      var vEl = document.createElement('span'); vEl.className = 'card-variant';
+      vEl.textContent = w.variant.replace(/([a-z])([A-Z])/g, '$1 $2').toUpperCase();
+      priceEl.appendChild(vEl);
     }
-    var trend = document.createElement('div');
-    trend.className = 'card-trend' + (w.trend ? (w.trend.dir === 1 ? ' up' : ' down') : ' flat');
-    trend.textContent = w.trend ? '▲ ' + Poke.formatTrend(w.trend) : '—';
-    quote.appendChild(price);
-    quote.appendChild(trend);
+    var trendEl = document.createElement('div');
+    trendEl.className = 'card-trend' + (w.trend ? (w.trend.dir === 1 ? ' up' : ' down') : ' flat');
+    trendEl.textContent = w.trend ? (w.trend.dir === 1 ? '▲ ' : '▼ ') + Math.abs(w.trend.pct).toFixed(1) + '%' : '—';
+    quote.appendChild(priceEl); quote.appendChild(trendEl);
 
-    // ---- 24h change ----
+    var grip = document.createElement('span'); grip.className = 'drag-grip';
+    grip.textContent = '⋮⋮'; grip.title = 'Drag to reorder';
+
+    var chevron = document.createElement('button');
+    chevron.className = 'expand-chevron'; chevron.type = 'button';
+    chevron.title = isExpanded ? 'Collapse details' : 'Expand details';
+    chevron.textContent = '▼';
+
+    row.appendChild(grip); row.appendChild(thumb); row.appendChild(info);
+    row.appendChild(quote); row.appendChild(chevron);
+
+    // ---- expanded panel ----
+    var expand = document.createElement('div');
+    expand.className = 'card-expand';
+    if (isExpanded) expand.classList.add('open');
+
+    // expand top: large thumb + details
+    var expandTop = document.createElement('div'); expandTop.className = 'expand-top';
+    var bigThumb = document.createElement('img');
+    bigThumb.className = 'expand-thumb'; bigThumb.alt = ''; bigThumb.src = w.image;
+    bigThumb.addEventListener('error', function () { bigThumb.replaceWith(pokePlaceholder('big')); });
+    var details = document.createElement('div'); details.className = 'expand-details';
+    var detName = document.createElement('div'); detName.className = 'det-name'; detName.textContent = w.name + (w.number ? ' · #' + w.number : '');
+    var detSet = document.createElement('div'); detSet.className = 'det-set'; detSet.textContent = (w.set || '') + (w.updatedAt ? ' · Updated ' + w.updatedAt : '');
+    details.appendChild(detName); details.appendChild(detSet);
+
+    // detail rows: 24h, ATH/ATL, volatility
+    var detRow = document.createElement('div'); detRow.className = 'expand-detail-row';
     var dayChg = dayChange(w);
     if (dayChg != null) {
-      var chg = document.createElement('div');
-      chg.className = 'card-daychg' + (dayChg > 0 ? ' up' : dayChg < 0 ? ' down' : '');
-      chg.textContent = (dayChg >= 0 ? '+' : '') + Poke.formatPrice(dayChg) + ' 24h';
-      quote.appendChild(chg);
+      var dc = document.createElement('span'); dc.className = 'card-daychg' + (dayChg > 0 ? ' up' : dayChg < 0 ? ' down' : '');
+      dc.textContent = (dayChg >= 0 ? '+' : '') + Poke.formatPrice(dayChg) + ' 24h'; detRow.appendChild(dc);
     }
-
-    // ---- ATH / ATL ----
-    var ath = allTimeHigh(w);
-    var atl = allTimeLow(w);
+    var ath = allTimeHigh(w); var atl = allTimeLow(w);
     if (ath != null && atl != null) {
-      var range = document.createElement('div');
-      range.className = 'card-range';
-      range.textContent = 'H ' + Poke.formatPrice(ath) + '  L ' + Poke.formatPrice(atl);
-      quote.appendChild(range);
+      var rng = document.createElement('span'); rng.className = 'card-range';
+      rng.textContent = 'H ' + Poke.formatPrice(ath) + '  L ' + Poke.formatPrice(atl); detRow.appendChild(rng);
     }
-
-    // ---- 7-day volatility ----
     if (Array.isArray(w.daily) && w.daily.length >= 2) {
-      var last7d = w.daily.slice(-7);
-      var dmin = Infinity; var dmax = -Infinity;
+      var last7d = w.daily.slice(-7); var dmin = Infinity; var dmax = -Infinity;
       last7d.forEach(function (d) { if (d.p < dmin) dmin = d.p; if (d.p > dmax) dmax = d.p; });
       if (dmin > 0 && dmax > dmin) {
         var vol = ((dmax - dmin) / dmin * 100).toFixed(1);
-        var volEl = document.createElement('div');
-        volEl.className = 'card-vol';
-        volEl.textContent = '±' + vol + '% 7d';
-        quote.appendChild(volEl);
+        var volEl = document.createElement('span'); volEl.className = 'card-vol';
+        volEl.textContent = '±' + vol + '% 7d'; detRow.appendChild(volEl);
       }
     }
+    details.appendChild(detRow);
 
-    // ---- range border ----
-    if (ath != null && atl != null && ath !== atl && w.price != null) {
-      var pctBorder = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
-      var hue = pctBorder * 1.2; // 0=red(0), 50=yellow(60), 100=green(120)
-      row.style.borderLeft = '3px solid hsl(' + hue + ', 70%, 45%)';
-      row.style.paddingLeft = '7px';
+    expandTop.appendChild(bigThumb); expandTop.appendChild(details);
+
+    // chart section
+    var chartSec = document.createElement('div'); chartSec.className = 'chart-section';
+    var chartTools = document.createElement('div'); chartTools.className = 'chart-tools';
+    ['7d', '30d', 'All'].forEach(function (rng) {
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = rng;
+      btn.classList.toggle('active', (expandedRange[w.id] || '30d') === (rng === 'All' ? 'all' : rng));
+      btn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var val = rng === 'All' ? 'all' : rng;
+        expandedRange[w.id] = val;
+        chartTools.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        drawChart(canvas, w, val);
+      });
+      chartTools.appendChild(btn);
+    });
+    chartSec.appendChild(chartTools);
+    var canvas = document.createElement('canvas');
+    canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 160;
+    chartSec.appendChild(canvas);
+    if (isExpanded) {
+      requestAnimationFrame(function () { drawChart(canvas, w, expandedRange[w.id] || '30d'); });
     }
 
-    // ---- price position bar ----
-    if (ath != null && atl != null && ath !== atl && w.price != null) {
-      var pct = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
-      var posBar = document.createElement('div');
-      posBar.className = 'card-posbar';
-      var fill = document.createElement('div');
-      fill.className = 'card-posfill';
-      fill.style.width = pct + '%';
-      posBar.appendChild(fill);
-      quote.appendChild(posBar);
-    }
-
-    var bars = document.createElement('div');
-    bars.className = 'card-bars';
-    bars.title = '30-day price sparkline';
-    bars.addEventListener('mouseenter', function (ev) {
-      showSparkTooltip(w, ev);
-    });
-    bars.addEventListener('mouseleave', function () {
-      els.sparkTooltip.hidden = true;
-    });
+    // expand bottom: sparkline + posbar
+    var expandBottom = document.createElement('div'); expandBottom.className = 'expand-bottom';
+    var bars = document.createElement('div'); bars.className = 'card-bars';
+    bars.title = '30-day sparkline';
+    bars.addEventListener('mouseenter', function (ev) { showSparkTooltip(w, ev); });
+    bars.addEventListener('mouseleave', function () { els.sparkTooltip.hidden = true; });
     var heights = Poke.sparkBars(w.daily, 30);
     if (heights.length) {
       heights.forEach(function (v) {
-        var b = document.createElement('span');
-        b.className = 'bar';
-        b.style.height = Math.round(v * 16) + 'px';
-        bars.appendChild(b);
+        var b = document.createElement('span'); b.className = 'bar';
+        b.style.height = Math.round(v * 24) + 'px'; bars.appendChild(b);
       });
-    } else {
-      bars.title = '';
+    }
+    expandBottom.appendChild(bars);
+
+    if (ath != null && atl != null && ath !== atl && w.price != null) {
+      var pct = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
+      var posBar = document.createElement('div'); posBar.className = 'card-posbar';
+      var fill = document.createElement('div'); fill.className = 'card-posfill';
+      fill.style.width = pct + '%'; posBar.appendChild(fill); expandBottom.appendChild(posBar);
     }
 
-    var x = document.createElement('button');
-    x.className = 'row-x';
-    x.type = 'button';
-    x.title = 'Remove from ticker';
-    x.setAttribute('aria-label', 'Remove ' + w.name + ' from ticker');
-    x.textContent = '✕';
-    x.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      removeCard(w.id);
-    });
+    // expand actions
+    var actions = document.createElement('div'); actions.className = 'expand-actions';
 
-    // ---- drag handle ----
-    var grip = document.createElement('span');
-    grip.className = 'drag-grip';
-    grip.textContent = '⋮⋮';
-    grip.title = 'Drag to reorder';
-    row.appendChild(grip);
-
-    row.appendChild(thumb);
-    row.appendChild(info);
-    row.appendChild(bars);
-    row.appendChild(quote);
-    row.appendChild(x);
-
-    // ---- alert affordance ----
-    var alertBtn = document.createElement('button');
-    alertBtn.className = 'alert-btn';
-    alertBtn.type = 'button';
-    var hasAlert = w.alertAbove || w.alertBelow;
-    if (hasAlert) {
-      var parts = [];
-      if (w.alertAbove) parts.push('above $' + w.alertAbove.toLocaleString());
-      if (w.alertBelow) parts.push('below $' + w.alertBelow.toLocaleString());
-      alertBtn.title = 'Alert: ' + parts.join(' · ') + ' (click to change)';
-      alertBtn.classList.remove('alert-off');
-    } else {
-      alertBtn.title = 'Set a price alert';
-      alertBtn.classList.add('alert-off');
-    }
-    alertBtn.textContent = '🔔';
-    row.appendChild(alertBtn);
-
-    // ---- ⭐ favorite toggle ----
     var favBtn = document.createElement('button');
-    favBtn.className = 'fav-btn' + (w.fav ? ' fav-on' : '');
-    favBtn.type = 'button';
-    favBtn.title = w.fav ? 'Unpin from top' : 'Pin to top';
-    favBtn.textContent = w.fav ? '⭐' : '☆';
+    favBtn.className = 'btn-sm'; favBtn.type = 'button';
+    favBtn.textContent = w.fav ? '⭐ Unpin' : '☆ Pin';
     favBtn.addEventListener('click', function (ev) {
       ev.stopPropagation();
-      w.fav = !w.fav;
-      favBtn.textContent = w.fav ? '⭐' : '☆';
-      favBtn.classList.toggle('fav-on', w.fav);
-      favBtn.title = w.fav ? 'Unpin from top' : 'Pin to top';
-      save();
-      render();
+      w.fav = !w.fav; save(); render();
     });
-    row.appendChild(favBtn);
+    actions.appendChild(favBtn);
 
-    row.appendChild(alertBtn);
+    var alertToggle = document.createElement('button');
+    alertToggle.className = 'btn-sm accent'; alertToggle.type = 'button';
+    alertToggle.textContent = (w.alertAbove || w.alertBelow || w.alertPct) ? '🔔 Edit alerts' : '🔔 Set alert';
+    alertToggle.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) { var fi = panel.querySelector('.alert-input'); if (fi) fi.focus(); }
+    });
+    actions.appendChild(alertToggle);
 
-    var panel = document.createElement('div');
-    panel.className = 'alert-panel';
-    panel.hidden = true;
+    var openLink = document.createElement('button');
+    openLink.className = 'btn-sm'; openLink.type = 'button';
+    openLink.textContent = '↗ View on TCGplayer';
+    openLink.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      if (w.tcgplayerUrl) chrome.windows.create({ type: 'popup', url: w.tcgplayerUrl, width: 900, height: 700 });
+    });
+    actions.appendChild(openLink);
 
-    function mkRow(label, key) {
-      var row = document.createElement('div');
-      row.className = 'alert-row';
-      var al = document.createElement('span');
-      al.className = 'alert-label'; al.textContent = label;
-      var ainp = document.createElement('input');
-      ainp.className = 'alert-input'; ainp.type = 'number'; ainp.min = '0.01'; ainp.step = 'any';
+    var remBtn = document.createElement('button');
+    remBtn.className = 'btn-sm danger'; remBtn.type = 'button';
+    remBtn.textContent = '✕ Remove';
+    remBtn.addEventListener('click', function (ev) { ev.stopPropagation(); removeCard(w.id); });
+    actions.appendChild(remBtn);
+
+    // alert panel
+    var panel = document.createElement('div'); panel.className = 'alert-panel'; panel.hidden = true;
+    function mkAlertRow(label, key) {
+      var ar = document.createElement('div'); ar.className = 'alert-row';
+      var al = document.createElement('span'); al.className = 'alert-label'; al.textContent = label;
+      var ainp = document.createElement('input'); ainp.className = 'alert-input'; ainp.type = 'number'; ainp.min = '0.01'; ainp.step = 'any';
       ainp.value = (w[key] || '');
       ainp.placeholder = key === 'alertPct' ? '10' : (w.price != null ? w.price.toFixed(2) : '0.00');
-      if (key === 'alertPct') ainp.title = 'Current base: ' + (w.alertPctBase != null ? Poke.formatPrice(w.alertPctBase) : 'not set') + ' — alert fires when price moves ± this % from the base';
-      var aset = document.createElement('button');
-      aset.className = 'alert-set'; aset.type = 'button'; aset.textContent = 'Set';
-      var aclr = document.createElement('button');
-      aclr.className = 'alert-clear'; aclr.type = 'button'; aclr.textContent = 'Clear';
-      row.appendChild(al); row.appendChild(ainp); row.appendChild(aset); row.appendChild(aclr);
-
+      if (key === 'alertPct') ainp.title = 'Current base: ' + (w.alertPctBase != null ? Poke.formatPrice(w.alertPctBase) : 'not set');
+      var aset = document.createElement('button'); aset.className = 'alert-set'; aset.type = 'button'; aset.textContent = 'Set';
+      var aclr = document.createElement('button'); aclr.className = 'alert-clear'; aclr.type = 'button'; aclr.textContent = 'Clear';
+      ar.appendChild(al); ar.appendChild(ainp); ar.appendChild(aset); ar.appendChild(aclr);
       aset.addEventListener('click', function (ev) {
         ev.stopPropagation();
         var v = parseFloat(ainp.value);
         if (isNaN(v) || v <= 0) { panel.hidden = true; return; }
         w[key] = v;
         if (key === 'alertPct') w.alertPctBase = w.price;
-        updateAlertBtn();
-        panel.hidden = true;
-        save();
+        updateAlertLabel(); panel.hidden = true; save();
       });
       aclr.addEventListener('click', function (ev) {
         ev.stopPropagation();
         w[key] = null;
         if (key === 'alertPct') w.alertPctBase = null;
-        ainp.value = '';
-        updateAlertBtn();
-        panel.hidden = true;
-        save();
+        ainp.value = ''; updateAlertLabel(); panel.hidden = true; save();
       });
-      return row;
+      return ar;
     }
-
-    function updateAlertBtn() {
+    function updateAlertLabel() {
       var has = w.alertAbove || w.alertBelow || w.alertPct;
-      if (has) {
-        var p = [];
-        if (w.alertAbove) p.push('above $' + w.alertAbove.toLocaleString());
-        if (w.alertBelow) p.push('below $' + w.alertBelow.toLocaleString());
-        if (w.alertPct) p.push('±' + w.alertPct + '%');
-        alertBtn.title = 'Alert: ' + p.join(' · ') + ' (click to change)';
-        alertBtn.classList.remove('alert-off');
-      } else {
-        alertBtn.title = 'Set a price alert';
-        alertBtn.classList.add('alert-off');
-      }
+      alertToggle.textContent = has ? '🔔 Edit alerts' : '🔔 Set alert';
+    }
+    panel.appendChild(mkAlertRow('Alert above $', 'alertAbove'));
+    panel.appendChild(mkAlertRow('Alert below $', 'alertBelow'));
+    panel.appendChild(mkAlertRow('Alert if ±%', 'alertPct'));
+
+    // assemble expand
+    expand.appendChild(expandTop);
+    expand.appendChild(chartSec);
+    expand.appendChild(expandBottom);
+    expand.appendChild(actions);
+    expand.appendChild(panel);
+
+    // range-colored left border on wrap
+    if (ath != null && atl != null && ath !== atl && w.price != null) {
+      var pctBorder = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
+      var hue = pctBorder * 1.2;
+      wrap.style.borderLeft = '3px solid hsl(' + hue + ', 70%, 45%)';
+      row.style.paddingLeft = '7px';
     }
 
-    panel.appendChild(mkRow('Alert above $', 'alertAbove'));
-    panel.appendChild(mkRow('Alert below $', 'alertBelow'));
-    panel.appendChild(mkRow('Alert if ±%', 'alertPct'));
-
-    alertBtn.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      panel.hidden = !panel.hidden;
-      if (!panel.hidden) {
-        var firstInput = panel.querySelector('.alert-input');
-        if (firstInput) firstInput.focus();
-      }
-    });
-
-    var wrap = document.createElement('div');
     wrap.appendChild(row);
-    wrap.appendChild(panel);
+    wrap.appendChild(expand);
 
-    row.addEventListener('dblclick', function (ev) {
-      if (ev.target.closest('.alert-btn') || ev.target.closest('.row-x') || ev.target.closest('.fav-btn') || ev.target.closest('.drag-grip')) return;
-      ev.preventDefault();
+    // ---- chevron toggles expand ----
+    chevron.addEventListener('click', function (ev) {
       ev.stopPropagation();
-      panel.hidden = !panel.hidden;
-      if (!panel.hidden) {
-        var firstInput = panel.querySelector('.alert-input');
-        if (firstInput) firstInput.focus();
+      if (expandedId === w.id) {
+        expandedId = null; render();
+      } else {
+        expandedId = w.id; render();
       }
     });
-    row.addEventListener('contextmenu', function (ev) {
-      ev.preventDefault();
-      ctxTarget = w;
-      els.ctxMenu.style.top = Math.min(ev.clientY, window.innerHeight - 120) + 'px';
-      els.ctxMenu.style.left = Math.min(ev.clientX, window.innerWidth - 130) + 'px';
-      els.ctxMenu.hidden = false;
-    });
+
+    // ---- row click opens TCGplayer ----
     row.addEventListener('click', function (ev) {
-      if (ev.target.closest('.drag-grip') || ev.target.closest('.alert-btn') || ev.target.closest('.row-x') || ev.target.closest('.fav-btn')) return;
+      if (ev.target.closest('.expand-chevron') || ev.target.closest('.drag-grip')) return;
       if (w.tcgplayerUrl) chrome.windows.create({ type: 'popup', url: w.tcgplayerUrl, width: 900, height: 700 });
     });
     row.addEventListener('keydown', function (ev) {
@@ -723,14 +666,13 @@
       }
     });
 
-    // ---- middle-click copy ----
-    row.addEventListener('auxclick', function (ev) {
-      if (ev.button === 1 && w.price != null) {
-        ev.preventDefault();
-        navigator.clipboard.writeText(Poke.formatPrice(w.price)).then(function () {
-          setStatus('📋 Copied ' + Poke.formatPrice(w.price));
-        }).catch(function () {});
-      }
+    // ---- right-click context menu ----
+    row.addEventListener('contextmenu', function (ev) {
+      ev.preventDefault();
+      ctxTarget = w;
+      els.ctxMenu.style.top = Math.min(ev.clientY, window.innerHeight - 120) + 'px';
+      els.ctxMenu.style.left = Math.min(ev.clientX, window.innerWidth - 130) + 'px';
+      els.ctxMenu.hidden = false;
     });
 
     // ---- middle-click copy ----
@@ -772,32 +714,22 @@
       if (dropIdx === dragIdx) return;
       var item = state.watch.splice(dragIdx, 1)[0];
       state.watch.splice(dropIdx, 0, item);
-      save();
-      render();
+      save(); render();
     });
+
     return wrap;
   }
 
-  function thumbPlaceholder() {
-    var d = document.createElement('div');
-    d.className = 'card-thumb ph';
-    d.textContent = '🃏';
-    return d;
-  }
-
   function renderTape() {
-    if (!state.watch.length) {
-      els.tape.innerHTML = '';
-      return;
-    }
+    if (!state.watch.length) { els.tape.innerHTML = ''; return; }
     var parts = state.watch.map(function (w) {
       var cls = w.trend ? (w.trend.dir === 1 ? 'up' : 'down') : 'flat';
       var chg = w.trend ? Poke.formatTrend(w.trend) : '—';
       return '<span class="tape-item"><span class="tape-name">' + esc(w.name) + '</span>' +
+        '<span class="tape-sep">·</span>' +
         '<span class="tape-price">' + esc(Poke.formatPrice(w.price)) + '</span>' +
         '<span class="tape-chg ' + cls + '">' + esc(chg) + '</span></span>';
     });
-    // duplicate for a seamless loop
     els.tape.innerHTML = parts.join('') + parts.join('');
     els.tape.style.animation = 'none';
     void els.tape.offsetWidth;
@@ -843,14 +775,11 @@
 
   // ---------- alert log ----------
   function renderAlertLog() {
-    var now = Date.now();
-    var day = 24 * 60 * 60 * 1000;
+    var now = Date.now(); var day = 24 * 60 * 60 * 1000;
     var items = [];
     state.watch.forEach(function (w) {
       if (!Array.isArray(w.alertLog)) return;
-      w.alertLog.forEach(function (a) {
-        if (now - a.ts <= day) items.push(a);
-      });
+      w.alertLog.forEach(function (a) { if (now - a.ts <= day) items.push(a); });
     });
     items.sort(function (a, b) { return b.ts - a.ts; });
     if (!items.length) {
@@ -876,18 +805,14 @@
     els.alertLogPanel.hidden = !els.alertLogPanel.hidden;
   });
 
-  // ---------- refresh button + auto-refresh ----------
+  // ---------- refresh + auto-refresh ----------
   els.sortBy.addEventListener('change', function () { render(); });
   els.exportCsv.addEventListener('click', exportCsv);
   els.copyAll.addEventListener('click', function () {
-    var lines = state.watch.map(function (w) {
-      return w.name + '\t' + (w.price != null ? '$' + w.price.toFixed(2) : '—');
-    });
+    var lines = state.watch.map(function (w) { return w.name + '\t' + (w.price != null ? '$' + w.price.toFixed(2) : '—'); });
     navigator.clipboard.writeText(lines.join('\n')).then(function () {
       setStatus('📋 Copied ' + state.watch.length + ' prices');
-    }).catch(function () {
-      setStatus('Could not copy', true);
-    });
+    }).catch(function () { setStatus('Could not copy', true); });
   });
   els.copyClip.addEventListener('click', function () {
     var lines = state.watch.map(function (w) {
@@ -896,10 +821,9 @@
     });
     navigator.clipboard.writeText(lines.join('\n')).then(function () {
       setStatus('📋 Copied ' + state.watch.length + ' cards to clipboard');
-    }).catch(function () {
-      setStatus('Could not copy — click 📥 CSV instead', true);
-    });
+    }).catch(function () { setStatus('Could not copy — click 📥 CSV instead', true); });
   });
+
   function updateSnooze() {
     if (!state.snoozeUntil || Date.now() >= state.snoozeUntil) {
       state.snoozeUntil = 0;
@@ -914,13 +838,9 @@
 
   els.snoozeBtn.addEventListener('click', function () {
     if (state.snoozeUntil && Date.now() < state.snoozeUntil) {
-      state.snoozeUntil = 0;
-      updateSnooze();
-      setStatus('Alerts re-enabled');
+      state.snoozeUntil = 0; updateSnooze(); setStatus('Alerts re-enabled');
     } else {
-      state.snoozeUntil = Date.now() + 3600000;
-      updateSnooze();
-      setStatus('Alerts snoozed for 1 hour');
+      state.snoozeUntil = Date.now() + 3600000; updateSnooze(); setStatus('Alerts snoozed for 1 hour');
     }
   });
 
@@ -954,13 +874,10 @@
   els.refresh.addEventListener('click', refreshAll);
   els.retry.addEventListener('click', refreshAll);
   els.clearAll.addEventListener('click', function () {
-    state.watch = [];
-    save();
-    setStatus('Cleared your ticker');
-    render();
+    state.watch = []; expandedId = null; save(); setStatus('Cleared your ticker'); render();
   });
 
-  // ---------- right-click context menu ----------
+  // ---------- context menu ----------
   document.addEventListener('click', function () { els.ctxMenu.hidden = true; });
   els.ctxMenu.addEventListener('click', function (ev) {
     ev.stopPropagation();
@@ -970,14 +887,10 @@
     if (action === 'copy-price') navigator.clipboard.writeText(Poke.formatPrice(w.price));
     else if (action === 'copy-name') navigator.clipboard.writeText(w.name);
     else if (action === 'remove') removeCard(w.id);
-    els.ctxMenu.hidden = true;
-    ctxTarget = null;
+    els.ctxMenu.hidden = true; ctxTarget = null;
   });
 
-  // Add right-click to card rows (delegated via the render function adding listeners)
-  // The contextmenu listener is added in rowFor below
-
-  // ---------- keyboard page zoom (family pattern) ----------
+  // ---------- keyboard page zoom ----------
   function applyPageZoom(z) {
     pageZoom = Math.round(z * 10) / 10;
     document.body.style.zoom = pageZoom === 1 ? '' : String(pageZoom);
@@ -987,7 +900,6 @@
     hintTimer = setTimeout(function () { setStatus(''); }, 1400);
   }
   document.addEventListener('keydown', function (ev) {
-    // ---- keyboard card navigation ----
     if (!ev.ctrlKey && !ev.metaKey) {
       if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
         ev.preventDefault();
@@ -1004,8 +916,7 @@
       if ((ev.key === 'Delete' || ev.key === 'Backspace') && focusIdx >= 0) {
         ev.preventDefault();
         var all = els.list.querySelectorAll('.card-row');
-        var idx = focusIdx;
-        focusIdx = -1;
+        var idx = focusIdx; focusIdx = -1;
         if (all[idx]) all[idx].classList.remove('focused');
         var sorted = state.watch.slice();
         sorted.sort(function (a, b) { return (b.fav ? 1 : 0) - (a.fav ? 1 : 0); });
@@ -1027,18 +938,8 @@
         return;
       }
     }
-    // ---- Ctrl/Cmd shortcuts ----
-    if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'r' || ev.key === 'R')) {
-      ev.preventDefault();
-      refreshAll();
-      return;
-    }
-    if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')) {
-      ev.preventDefault();
-      els.search.focus();
-      els.search.select();
-      return;
-    }
+    if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'r' || ev.key === 'R')) { ev.preventDefault(); refreshAll(); return; }
+    if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')) { ev.preventDefault(); els.search.focus(); els.search.select(); return; }
     if (!(ev.ctrlKey || ev.metaKey)) return;
     var k = ev.key;
     if (k === '+' || k === '=' || k === '-' || k === '_') {
@@ -1046,11 +947,7 @@
       var dz = (k === '+' || k === '=') ? 0.1 : -0.1;
       applyPageZoom(Math.max(0.5, Math.min(2, pageZoom + dz)));
       flashZoomHint();
-    } else if (k === '0') {
-      ev.preventDefault();
-      applyPageZoom(1);
-      flashZoomHint();
-    }
+    } else if (k === '0') { ev.preventDefault(); applyPageZoom(1); flashZoomHint(); }
   });
 
   // ---------- CSV export ----------
@@ -1059,19 +956,8 @@
     state.watch.forEach(function (w) {
       var trendStr = w.trend ? (w.trend.dir === 1 ? '+' : '') + w.trend.pct.toFixed(1) + '%' : '—';
       var alertCount = 0;
-      if (Array.isArray(w.alertLog)) {
-        var day = 24 * 60 * 60 * 1000;
-        alertCount = w.alertLog.filter(function (a) { return Date.now() - a.ts <= day; }).length;
-      }
-      rows.push([
-        w.name,
-        w.price != null ? w.price.toFixed(2) : '',
-        trendStr,
-        w.alertAbove != null ? w.alertAbove.toFixed(2) : '',
-        w.alertBelow != null ? w.alertBelow.toFixed(2) : '',
-        w.alertPct != null ? w.alertPct + '%' : '',
-        String(alertCount)
-      ]);
+      if (Array.isArray(w.alertLog)) { var day = 24 * 60 * 60 * 1000; alertCount = w.alertLog.filter(function (a) { return Date.now() - a.ts <= day; }).length; }
+      rows.push([w.name, w.price != null ? w.price.toFixed(2) : '', trendStr, w.alertAbove != null ? w.alertAbove.toFixed(2) : '', w.alertBelow != null ? w.alertBelow.toFixed(2) : '', w.alertPct != null ? w.alertPct + '%' : '', String(alertCount)]);
     });
     var csv = rows.map(function (r) { return r.map(function (c) { return '"' + c + '"'; }).join(','); }).join('\n');
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1087,20 +973,99 @@
     var min = Infinity; var max = -Infinity;
     last7.forEach(function (d) { if (d.p < min) min = d.p; if (d.p > max) max = d.p; });
     var range = max - min || 1;
-    var html = '<div class="spark-title">7-day trend</div>';
-    html += '<div class="spark-bars">';
+    var html = '<div class="spark-title">7-day trend</div><div class="spark-bars">';
     last7.forEach(function (d) {
       var h = Math.round((d.p - min) / range * 40);
       html += '<span class="spark-bar-wrap"><span class="spark-bar" style="height:' + h + 'px" title="' + d.d + ': ' + Poke.formatPrice(d.p) + '"></span></span>';
     });
     html += '</div>';
-    var first = last7[0]; var last = last7[last7.length - 1];
-    var chg = last.p - first.p;
+    var first = last7[0]; var last = last7[last7.length - 1]; var chg = last.p - first.p;
     html += '<div class="spark-summary">' + (chg >= 0 ? '+' : '') + Poke.formatPrice(chg) + ' over 7 days</div>';
     els.sparkTooltip.innerHTML = html;
     els.sparkTooltip.style.top = (ev.clientY - 90) + 'px';
     els.sparkTooltip.style.left = Math.min(ev.clientX - 60, window.innerWidth - 170) + 'px';
     els.sparkTooltip.hidden = false;
+  }
+
+  // ---------- canvas price chart ----------
+  function getChartData(w, range) {
+    if (!Array.isArray(w.daily) || !w.daily.length) return [];
+    var now = Date.now();
+    var cutoff = 0;
+    if (range === '7d') cutoff = now - 7 * 86400000;
+    else if (range === '30d') cutoff = now - 30 * 86400000;
+    return w.daily.filter(function (d) {
+      if (!cutoff) return true;
+      return new Date(d.d + 'T12:00:00Z').getTime() >= cutoff;
+    });
+  }
+
+  function drawChart(canvas, w, range) {
+    var data = getChartData(w, range);
+    if (!data.length) { var ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+    var W = canvas.width; var H = canvas.height;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    var pad = { top: 16, right: 12, bottom: 24, left: 48 };
+    var pw = W - pad.left - pad.right;
+    var ph = H - pad.top - pad.bottom;
+
+    var prices = data.map(function (d) { return d.p; });
+    var min = Math.min.apply(null, prices);
+    var max = Math.max.apply(null, prices);
+    var spread = max - min || 1;
+    min -= spread * 0.05; max += spread * 0.05;
+    var yr = max - min || 1;
+
+    function x(i) { return pad.left + (i / Math.max(1, data.length - 1)) * pw; }
+    function y(p) { return pad.top + (1 - (p - min) / yr) * ph; }
+
+    // grid lines
+    ctx.strokeStyle = '#1e2c4d'; ctx.lineWidth = 0.5;
+    var steps = 4;
+    for (var g = 0; g <= steps; g++) {
+      var gVal = min + (yr * g / steps);
+      var gy = y(gVal);
+      ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(W - pad.right, gy); ctx.stroke();
+      ctx.fillStyle = '#8fa1c7'; ctx.font = '9px -apple-system, sans-serif';
+      ctx.textAlign = 'right'; ctx.fillText('$' + gVal.toFixed(0), pad.left - 5, gy + 3);
+    }
+
+    // gradient fill
+    var grad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
+    grad.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
+    grad.addColorStop(1, 'rgba(56, 189, 248, 0.02)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(x(0), y(prices[0]));
+    for (var i = 1; i < data.length; i++) { ctx.lineTo(x(i), y(prices[i])); }
+    ctx.lineTo(x(data.length - 1), H - pad.bottom);
+    ctx.lineTo(x(0), H - pad.bottom);
+    ctx.closePath(); ctx.fill();
+
+    // line
+    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x(0), y(prices[0]));
+    for (var j = 1; j < data.length; j++) { ctx.lineTo(x(j), y(prices[j])); }
+    ctx.stroke();
+
+    // dots
+    var dotStep = Math.max(1, Math.floor(data.length / 8));
+    for (var k = 0; k < data.length; k += dotStep) {
+      var dx = x(k); var dy = y(prices[k]);
+      ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(dx, dy, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0e1626'; ctx.beginPath(); ctx.arc(dx, dy, 1.2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // date labels
+    ctx.fillStyle = '#8fa1c7'; ctx.font = '8px -apple-system, sans-serif'; ctx.textAlign = 'center';
+    var labelCount = Math.min(5, data.length);
+    for (var l = 0; l < labelCount; l++) {
+      var idx = Math.floor(l * (data.length - 1) / Math.max(1, labelCount - 1));
+      ctx.fillText(data[idx].d.slice(5), x(idx), H - 6);
+    }
   }
 
   function updateRefreshAge() {
@@ -1134,7 +1099,6 @@
     setInterval(refreshAll, REFRESH_MS);
     setTimeout(function () { updateBadge(); }, 500);
     setInterval(updateRefreshAge, 10000);
-    // countdown ring on refresh button
     countdownTimer = setInterval(function () {
       var elapsed = Date.now() - intervalStart;
       var pct = Math.min(100, (elapsed % REFRESH_MS) / REFRESH_MS * 100);
