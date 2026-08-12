@@ -446,7 +446,9 @@
     // draw inline sparklines
     var sparks = els.list.querySelectorAll('.inline-spark');
     for (var ci = 0; ci < sparks.length; ci++) {
-      var wcId = sparks[ci].parentNode.querySelector('.card-row')._watchId;
+      // The spark canvas is a child of the card row itself, not a child of a nested row.
+      var wcRow = sparks[ci].closest('.card-row');
+      var wcId = wcRow && wcRow._watchId;
       var wcW = state.watch.find(function (x) { return x.id === wcId; });
       if (wcW) drawInlineSpark(sparks[ci], wcW);
     }
