@@ -392,10 +392,14 @@
     // draw chart synchronously — DOM is fully populated now
     if (expandedId) {
       var chartWrap = els.list.querySelector('.card-wrap.expanded');
-      if (chartWrap) {
+      if (!chartWrap) { setStatus('DEBUG: no .card-wrap.expanded found', true); }
+      else {
         var chartCanvas = chartWrap.querySelector('.price-chart');
         var chartW = state.watch.find(function (x) { return x.id === expandedId; });
-        if (chartCanvas && chartW) {
+        if (!chartCanvas) { setStatus('DEBUG: no canvas found', true); }
+        else if (!chartW) { setStatus('DEBUG: watch entry not found for ' + expandedId, true); }
+        else {
+          setStatus('DEBUG: drawing chart for ' + chartW.name + ' with ' + (chartW.daily ? chartW.daily.length : 0) + ' daily pts');
           var chartRange = expandedRange[expandedId] || '30d';
           drawChart(chartCanvas, chartW, chartRange);
           var chartTools = chartWrap.querySelector('.chart-tools');
@@ -1036,10 +1040,14 @@
     var ctx = canvas.getContext('2d');
     if (!data.length) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#8fa1c7';
-      ctx.font = '14px -apple-system, sans-serif';
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px -apple-system, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Not enough price history yet — check back tomorrow', canvas.width / 2, canvas.height / 2);
+      ctx.fillText('Not enough price history yet', canvas.width / 2, canvas.height / 2 - 10);
+      ctx.font = '14px -apple-system, sans-serif';
+      ctx.fillText('Keep the popup open — data builds daily', canvas.width / 2, canvas.height / 2 + 20);
       return;
     }
     var W = canvas.width; var H = canvas.height;
