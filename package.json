@@ -1,0 +1,10 @@
+{
+  "name": "pokemon-price-ticker",
+  "version": "1.0.0",
+  "description": "Search any Pokémon card and watch its market price like a stock ticker.",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "syntax": "node --check ext/cards.js && node --check ext/popup.js"
+  }
+}

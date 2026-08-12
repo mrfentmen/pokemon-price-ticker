@@ -1,0 +1,86 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { width: 1280px; height: 800px; overflow: hidden; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background:
+    radial-gradient(1100px 540px at 16% 10%, rgba(255, 255, 255, 0.16), transparent 60%),
+    radial-gradient(700px 460px at 92% 88%, rgba(239, 68, 68, 0.55), transparent 55%),
+    radial-gradient(500px 380px at 8% 92%, rgba(255, 255, 255, 0.10), transparent 60%),
+    linear-gradient(135deg, #1e293b 0%, #0f172a 55%, #7f1d1d 130%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  padding: 40px;
+}
+
+.title {
+  font-size: 54px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
+  position: absolute;
+  top: 44px;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+.title::after {
+  content: "Pokémon Card Prices";
+  display: block;
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  margin-top: 8px;
+  opacity: 0.85;
+}
+
+.box {
+  width: 430px;
+  height: 560px;
+  background: #0b1220;
+  border-radius: 18px;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  position: relative;
+}
+
+.preview {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  transform-origin: top left;
+  background: #0b1220;
+}
+
+.caption {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding: 11px 28px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
