@@ -118,6 +118,7 @@
       if (Array.isArray(w)) {
         state.watch = w.filter(function (c) { return c && c.id && c.name; }).map(function (c) {
           if (!Array.isArray(c.daily)) c.daily = [];
+          if (!c.daily.length && c.price != null) { var today = new Date().toISOString().slice(0, 10); c.daily.push({ d: today, p: c.price }); }
           if (!Array.isArray(c.alertLog)) c.alertLog = [];
           else c.alertLog = c.alertLog.filter(function (a) { return a && typeof a.ts === 'number' && typeof a.price === 'number'; }).slice(-50);
           return c;
@@ -229,10 +230,12 @@
   function addCard(c) {
     var existing = state.watch.some(function (w) { return w.id === c.id; });
     if (existing) { setStatus('Already on your ticker.'); return; }
+    var daily = [];
+    if (c.price != null) { var today = new Date().toISOString().slice(0, 10); daily.push({ d: today, p: c.price }); }
     state.watch.unshift({
       id: c.id, name: c.name, set: c.set, number: c.number, image: c.image,
       price: c.price, variant: c.variant, trend: null, updatedAt: '', tcgplayerUrl: c.tcgplayerUrl,
-      ts: Date.now()
+      ts: Date.now(), daily: daily
     });
     save(); render(); refreshCard(state.watch[0]);
   }
@@ -943,14 +946,9 @@
     var ctx = canvas.getContext('2d');
     if (!data.length) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ef4444';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 16px -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Not enough price history yet', canvas.width / 2, canvas.height / 2 - 10);
-      ctx.font = '14px -apple-system, sans-serif';
-      ctx.fillText('Keep the popup open — data builds daily', canvas.width / 2, canvas.height / 2 + 20);
+      ctx.fillStyle = '#1e2c4d'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#6b7c9e'; ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Price history builds daily — check back tomorrow', canvas.width / 2, canvas.height / 2);
       return;
     }
     var W = canvas.width; var H = canvas.height;
