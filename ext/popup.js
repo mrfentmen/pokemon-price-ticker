@@ -183,6 +183,19 @@
       })
       .catch(function (err) {
         if (myId !== searchId) return;
+        var isNetworkBlock = !err.status && (err.message || '').indexOf('Failed to fetch') !== -1;
+        if (isNetworkBlock) {
+          els.results.innerHTML = '<div class="res-note" style="text-align:center;padding:12px;">🔒 Chrome blocked the API.<br><br><button id="grantPermBtn" style="padding:7px 16px;border-radius:8px;border:0;background:#38bdf8;color:#fff;font-weight:700;cursor:pointer;font-size:12px;">🔓 Grant Access (one click)</button></div>';
+          setTimeout(function() {
+            var btn = document.getElementById('grantPermBtn');
+            if (btn) btn.addEventListener('click', function() {
+              chrome.permissions.request({ origins: ['https://api.pokemontcg.io/*'] }, function(granted) {
+                if (granted) { els.results.hidden = true; doSearch(els.search.value); }
+              });
+            });
+          }, 50);
+          return;
+        }
         var feedProblem = !err || !err.status || err.status === 429 || err.status >= 500;
         els.results.innerHTML = feedProblem
           ? '<div class="res-note">The price feed is hiccuping — try again in a moment.</div>'
@@ -1087,5 +1100,11 @@
     }, 250);
   });
   health('READY', true);
+  // Proactively check/request API permission
+  chrome.permissions.contains({ origins: ['https://api.pokemontcg.io/*'] }, function(has) {
+    if (!has) {
+      setStatus('🔒 API access not granted — type anything to unlock', true);
+    }
+  });
   } catch(e) { health('ERROR: ' + (e.message || 'unknown'), false); console.error(e); }
 })();

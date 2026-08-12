@@ -19,6 +19,9 @@
   "host_permissions": [
     "https://api.pokemontcg.io/*"
   ],
+  "optional_host_permissions": [
+    "https://api.pokemontcg.io/*"
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
