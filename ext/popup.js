@@ -24,7 +24,8 @@
     alertLogBtn: document.getElementById('alertLogBtn'),
     alertLogPanel: document.getElementById('alertLogPanel'),
     portfolio: document.getElementById('portfolio'),
-    sortBy: document.getElementById('sortBy')
+    sortBy: document.getElementById('sortBy'),
+    exportCsv: document.getElementById('exportCsv')
   };
 
   var chimeCtx = null;
@@ -291,8 +292,8 @@
     entry.image = q.image || entry.image;
     entry.cmAvg1 = q.cmAvg1; entry.cmAvg7 = q.cmAvg7; entry.cmAvg30 = q.cmAvg30;
     entry.ts = Date.now();
-    if (crossedAbove) { flashAlert(entry, 'above'); chime(); }
-    if (crossedBelow) { flashAlert(entry, 'below'); chime(); }
+    if (crossedAbove) { flashAlert(entry, 'above'); chime(); updateBadge(); }
+    if (crossedBelow) { flashAlert(entry, 'below'); chime(); updateBadge(); }
     // percentage-based alert crossing
     if (entry.alertPct && entry.alertPctBase != null && oldPrice != null && q.price != null) {
       var pctChange = Math.abs(q.price - entry.alertPctBase) / entry.alertPctBase * 100;
@@ -318,6 +319,7 @@
     els.empty.hidden = state.watch.length > 0;
     els.tapeWrap.hidden = state.watch.length === 0;
     els.clearAll.hidden = state.watch.length === 0;
+    els.exportCsv.hidden = state.watch.length === 0;
     renderTape();
     // portfolio total
     var sum = 0; var priced = 0;
@@ -587,6 +589,7 @@
 
   // ---------- refresh button + auto-refresh ----------
   els.sortBy.addEventListener('change', function () { render(); });
+  els.exportCsv.addEventListener('click', exportCsv);
   els.refresh.addEventListener('click', refreshAll);
   els.retry.addEventListener('click', refreshAll);
   els.clearAll.addEventListener('click', function () {
@@ -606,6 +609,12 @@
     hintTimer = setTimeout(function () { setStatus(''); }, 1400);
   }
   document.addEventListener('keydown', function (ev) {
+    if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')) {
+      ev.preventDefault();
+      els.search.focus();
+      els.search.select();
+      return;
+    }
     if (!(ev.ctrlKey || ev.metaKey)) return;
     var k = ev.key;
     if (k === '+' || k === '=' || k === '-' || k === '_') {
@@ -620,10 +629,50 @@
     }
   });
 
+  // ---------- CSV export ----------
+  function exportCsv() {
+    var rows = [['Name','Price','Trend','Alert Above','Alert Below','Alert ±%','24h Alerts']];
+    state.watch.forEach(function (w) {
+      var trendStr = w.trend ? (w.trend.dir === 1 ? '+' : '') + w.trend.pct.toFixed(1) + '%' : '—';
+      var alertCount = 0;
+      if (Array.isArray(w.alertLog)) {
+        var day = 24 * 60 * 60 * 1000;
+        alertCount = w.alertLog.filter(function (a) { return Date.now() - a.ts <= day; }).length;
+      }
+      rows.push([
+        w.name,
+        w.price != null ? w.price.toFixed(2) : '',
+        trendStr,
+        w.alertAbove != null ? w.alertAbove.toFixed(2) : '',
+        w.alertBelow != null ? w.alertBelow.toFixed(2) : '',
+        w.alertPct != null ? w.alertPct + '%' : '',
+        String(alertCount)
+      ]);
+    });
+    var csv = rows.map(function (r) { return r.map(function (c) { return '"' + c + '"'; }).join(','); }).join('\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'poketicker-watchlist.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function updateBadge() {
+    var day = 24 * 60 * 60 * 1000; var total = 0;
+    state.watch.forEach(function (w) {
+      if (!Array.isArray(w.alertLog)) return;
+      w.alertLog.forEach(function (a) { if (Date.now() - a.ts <= day) total++; });
+    });
+    chrome.action.setBadgeText({ text: total ? String(Math.min(total, 99)) : '' });
+    chrome.action.setBadgeBackgroundColor({ color: '#a78bfa' });
+  }
+
   // ---------- init ----------
+  chrome.action.setBadgeText({ text: '' });
   load(function () {
     render();
     if (state.watch.length) refreshAll();
     setInterval(refreshAll, REFRESH_MS);
+    setTimeout(function () { updateBadge(); }, 500);
   });
 })();
