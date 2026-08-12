@@ -12,7 +12,9 @@
   var UA = 'PokeTicker/1.0 (https://github.com/mrfentmen/pokemon-price-ticker; contactae2000@gmail.com)';
 
   function searchUrl(query, pageSize) {
-    return API + '/cards?q=name:' + encodeURIComponent(query + '*') +
+    // Escape Lucene special characters so "Mr. Mime", "Type: Null", etc work
+    var safe = query.replace(/([!()+\-\[\]{}^~?:.&|\/\\])/g, '\\$1');
+    return API + '/cards?q=name:' + encodeURIComponent(safe + '*') +
       '&pageSize=' + (pageSize || 8) + '&orderBy=-set.releaseDate';
   }
 
