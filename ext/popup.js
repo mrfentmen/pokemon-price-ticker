@@ -174,12 +174,14 @@
     var myId = ++searchId;
     els.results.innerHTML = '<div class="res-note">Searching…</div>';
     els.results.hidden = false;
+    savePopupState();
     Poke.fetchJson(Poke.searchUrl(q), { tries: 3, backoff: 700 })
       .then(function (json) {
         if (myId !== searchId) return;
         var cards = Poke.parseSearch(json);
         saveRecent(q);
         renderResults(cards, q);
+        savePopupState();
       })
       .catch(function (err) {
         if (myId !== searchId) return;
@@ -222,6 +224,7 @@
   els.search.addEventListener('input', function () {
     if (debounce) clearTimeout(debounce);
     debounce = setTimeout(function () { doSearch(els.search.value); }, 250);
+    savePopupState();
   });
   els.search.addEventListener('keydown', function (ev) {
     if (ev.key === 'Enter') { doSearch(els.search.value); }
@@ -237,6 +240,43 @@
   document.addEventListener('click', function (ev) {
     if (!ev.target.closest('.search-wrap')) els.results.hidden = true;
   });
+
+  // ---------- popup state persistence (search text, scroll, results) ----------
+  function savePopupState() {
+    chrome.storage.local.set({
+      ptPopupState: {
+        searchText: els.search.value,
+        scrollY: window.scrollY || document.documentElement.scrollTop || 0,
+        resultsOpen: !els.results.hidden,
+        resultsHTML: els.results.hidden ? '' : els.results.innerHTML
+      }
+    });
+  }
+  function restorePopupState() {
+    chrome.storage.local.get('ptPopupState', function(d) {
+      var ps = d && d.ptPopupState;
+      if (!ps) return;
+      if (ps.searchText) {
+        els.search.value = ps.searchText;
+        doSearch(ps.searchText);
+      }
+      if (ps.resultsOpen && ps.resultsHTML) {
+        els.results.innerHTML = ps.resultsHTML;
+        els.results.hidden = false;
+      }
+      if (ps.scrollY) {
+        setTimeout(function () { window.scrollTo(0, ps.scrollY); }, 50);
+      }
+    });
+  }
+  // Save on scroll (debounced)
+  var scrollTimer = null;
+  document.addEventListener('scroll', function () {
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(savePopupState, 200);
+  }, { passive: true });
+  // Save right before the popup closes
+  window.addEventListener('beforeunload', savePopupState);
 
   // ---------- watchlist ----------
   function addCard(c) {
@@ -1067,6 +1107,7 @@
   health('checking Poke...', false);
   if (typeof Poke === 'undefined') { health('POKE MISSING', false); throw new Error('Poke not loaded'); }
   health('Poke OK, init...', false);
+  restorePopupState();
   chrome.action.setBadgeText({ text: '' });
   applyTheme();
   applyCompact();
