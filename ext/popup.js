@@ -29,10 +29,13 @@
     copyClip: document.getElementById('copyClip'),
     compactToggle: document.getElementById('compactToggle'),
     themeToggle: document.getElementById('themeToggle'),
-    ctxMenu: document.getElementById('ctxMenu')
+    ctxMenu: document.getElementById('ctxMenu'),
+    refreshAge: document.getElementById('refreshAge')
   };
 
   var ctxTarget = null;
+  var focusIdx = -1;
+  var lastRefreshTime = 0;
 
   var dragIdx = -1;
   var compact = false;
@@ -268,6 +271,8 @@
           els.refresh.classList.remove('spinning');
           if (succeeded > 0) {
             setStatus('');
+            lastRefreshTime = Date.now();
+            updateRefreshAge();
           } else {
             // everything failed: fall back to cached quotes with their age
             var oldest = null;
@@ -597,6 +602,26 @@
       }
     });
 
+    // ---- middle-click copy ----
+    row.addEventListener('auxclick', function (ev) {
+      if (ev.button === 1 && w.price != null) {
+        ev.preventDefault();
+        navigator.clipboard.writeText(Poke.formatPrice(w.price)).then(function () {
+          setStatus('📋 Copied ' + Poke.formatPrice(w.price));
+        }).catch(function () {});
+      }
+    });
+
+    // ---- middle-click copy ----
+    row.addEventListener('auxclick', function (ev) {
+      if (ev.button === 1 && w.price != null) {
+        ev.preventDefault();
+        navigator.clipboard.writeText(Poke.formatPrice(w.price)).then(function () {
+          setStatus('📋 Copied ' + Poke.formatPrice(w.price));
+        }).catch(function () {});
+      }
+    });
+
     // ---- drag-to-reorder ----
     row.draggable = true;
     row.addEventListener('dragstart', function (ev) {
@@ -807,6 +832,47 @@
     hintTimer = setTimeout(function () { setStatus(''); }, 1400);
   }
   document.addEventListener('keydown', function (ev) {
+    // ---- keyboard card navigation ----
+    if (!ev.ctrlKey && !ev.metaKey) {
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        var cards = els.list.querySelectorAll('.card-row');
+        if (!cards.length) return;
+        if (focusIdx >= 0) cards[focusIdx].classList.remove('focused');
+        focusIdx += ev.key === 'ArrowDown' ? 1 : -1;
+        if (focusIdx < 0) focusIdx = 0;
+        if (focusIdx >= cards.length) focusIdx = cards.length - 1;
+        cards[focusIdx].classList.add('focused');
+        cards[focusIdx].focus({ preventScroll: true });
+        return;
+      }
+      if ((ev.key === 'Delete' || ev.key === 'Backspace') && focusIdx >= 0) {
+        ev.preventDefault();
+        var all = els.list.querySelectorAll('.card-row');
+        var idx = focusIdx;
+        focusIdx = -1;
+        if (all[idx]) all[idx].classList.remove('focused');
+        var sorted = state.watch.slice();
+        sorted.sort(function (a, b) { return (b.fav ? 1 : 0) - (a.fav ? 1 : 0); });
+        var favs = sorted.filter(function (w) { return w.fav; });
+        var rest = sorted.filter(function (w) { return !w.fav; });
+        var sort = els.sortBy.value;
+        if (sort === 'name') rest.sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+        else if (sort === 'price-desc') rest.sort(function (a, b) { return (b.price || 0) - (a.price || 0); });
+        else if (sort === 'price-asc') rest.sort(function (a, b) { return (a.price || 0) - (b.price || 0); });
+        else if (sort === 'trend-desc') rest.sort(function (a, b) { var ta = a.trend ? a.trend.pct : 0; var tb = b.trend ? b.trend.pct : 0; return tb - ta; });
+        else if (sort === 'trend-asc') rest.sort(function (a, b) { var ta = a.trend ? a.trend.pct : 0; var tb = b.trend ? b.trend.pct : 0; return ta - tb; });
+        sorted = favs.concat(rest);
+        if (idx < sorted.length) removeCard(sorted[idx].id);
+        return;
+      }
+      if (ev.key === 'Enter' && focusIdx >= 0) {
+        var rows = els.list.querySelectorAll('.card-row');
+        if (rows[focusIdx]) rows[focusIdx].click();
+        return;
+      }
+    }
+    // ---- Ctrl/Cmd shortcuts ----
     if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')) {
       ev.preventDefault();
       els.search.focus();
@@ -855,6 +921,15 @@
     URL.revokeObjectURL(url);
   }
 
+  function updateRefreshAge() {
+    if (!lastRefreshTime) { els.refreshAge.textContent = ''; return; }
+    var sec = Math.floor((Date.now() - lastRefreshTime) / 1000);
+    if (sec < 10) els.refreshAge.textContent = '• Live';
+    else if (sec < 60) els.refreshAge.textContent = '• ' + sec + 's ago';
+    else if (sec < 3600) els.refreshAge.textContent = '• ' + Math.floor(sec / 60) + 'm ago';
+    else els.refreshAge.textContent = '• ' + Math.floor(sec / 3600) + 'h ago';
+  }
+
   function updateBadge() {
     var day = 24 * 60 * 60 * 1000; var total = 0;
     state.watch.forEach(function (w) {
@@ -874,5 +949,6 @@
     if (state.watch.length) refreshAll();
     setInterval(refreshAll, REFRESH_MS);
     setTimeout(function () { updateBadge(); }, 500);
+    setInterval(updateRefreshAge, 10000);
   });
 })();
