@@ -228,3 +228,30 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
+
+/* ---------- alert log ---------- */
+.alert-log-btn {
+  flex: none; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card); color: var(--muted); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.alert-log-btn:hover { color: var(--accent); border-color: var(--accent); }
+.alert-log-btn.has-log { color: var(--accent2); border-color: rgba(251, 191, 36, 0.35); }
+
+.alert-log-panel {
+  margin: 4px 16px 0; max-height: 140px; overflow-y: auto;
+  background: var(--card); border: 1px solid var(--border); border-radius: 9px;
+}
+.alert-log-panel[hidden] { display: none; }
+
+.alert-log-item {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 5px 10px; border-bottom: 1px solid var(--border);
+  font-size: 11px; font-variant-numeric: tabular-nums;
+}
+.alert-log-item:last-child { border-bottom: 0; }
+.alert-log-name { font-weight: 700; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-log-dir { color: var(--accent2); font-weight: 700; white-space: nowrap; }
+.alert-log-price { color: var(--text); font-weight: 800; white-space: nowrap; }
+.alert-log-time { color: var(--muted); font-size: 10px; margin-left: auto; white-space: nowrap; }

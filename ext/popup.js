@@ -20,7 +20,9 @@
     tapeWrap: document.getElementById('tape-wrap'),
     tape: document.getElementById('tape'),
     clearAll: document.getElementById('clear-all'),
-    retry: document.getElementById('retry')
+    retry: document.getElementById('retry'),
+    alertLogBtn: document.getElementById('alertLogBtn'),
+    alertLogPanel: document.getElementById('alertLogPanel')
   };
 
   var hintTimer = null;
@@ -44,6 +46,11 @@
   }
 
   function flashAlert(entry, dir) {
+    if (!Array.isArray(entry.alertLog)) entry.alertLog = [];
+    entry.alertLog.push({ ts: Date.now(), dir: dir, threshold: dir === 'above' ? entry.alertAbove : entry.alertBelow, price: entry.price, name: entry.name });
+    if (entry.alertLog.length > 50) entry.alertLog = entry.alertLog.slice(-50);
+    save();
+    renderAlertLog();
     if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
     var threshold = dir === 'above' ? entry.alertAbove : entry.alertBelow;
     var verb = dir === 'above' ? 'hit' : 'dropped below';
@@ -68,6 +75,8 @@
       if (Array.isArray(w)) {
         state.watch = w.filter(function (c) { return c && c.id && c.name; }).map(function (c) {
           if (!Array.isArray(c.daily)) c.daily = [];
+          if (!Array.isArray(c.alertLog)) c.alertLog = [];
+          else c.alertLog = c.alertLog.filter(function (a) { return a && typeof a.ts === 'number' && typeof a.price === 'number'; }).slice(-50);
           return c;
         });
       }
@@ -494,6 +503,39 @@
     d.textContent = s == null ? '' : String(s);
     return d.innerHTML;
   }
+
+  // ---------- alert log ----------
+  function renderAlertLog() {
+    var now = Date.now();
+    var day = 24 * 60 * 60 * 1000;
+    var items = [];
+    state.watch.forEach(function (w) {
+      if (!Array.isArray(w.alertLog)) return;
+      w.alertLog.forEach(function (a) {
+        if (now - a.ts <= day) items.push(a);
+      });
+    });
+    items.sort(function (a, b) { return b.ts - a.ts; });
+    if (!items.length) {
+      els.alertLogBtn.classList.remove('has-log');
+      if (!els.alertLogPanel.hidden) els.alertLogPanel.hidden = true;
+      return;
+    }
+    els.alertLogBtn.classList.add('has-log');
+    var html = '';
+    items.forEach(function (a) {
+      var time = new Date(a.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      var dir = a.dir === 'above' ? '↑ hit' : '↓ below';
+      html += '<div class="alert-log-item"><span class="alert-log-name">' + esc(a.name) + '</span> <span class="alert-log-dir">' + dir + ' $' + (a.threshold || 0).toLocaleString() + '</span> <span class="alert-log-price">→ ' + Poke.formatPrice(a.price) + '</span> <span class="alert-log-time">' + time + '</span></div>';
+    });
+    els.alertLogPanel.innerHTML = html;
+    if (!els.alertLogPanel.hidden) els.alertLogPanel.scrollTop = 0;
+  }
+
+  els.alertLogBtn.addEventListener('click', function () {
+    renderAlertLog();
+    els.alertLogPanel.hidden = !els.alertLogPanel.hidden;
+  });
 
   // ---------- refresh button + auto-refresh ----------
   els.refresh.addEventListener('click', refreshAll);
