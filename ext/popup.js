@@ -443,16 +443,12 @@
       els.list.appendChild(rowFor(w));
     });
 
-    // draw all charts now that DOM is populated
-    var wraps = els.list.querySelectorAll('.card-wrap');
-    for (var ci = 0; ci < wraps.length; ci++) {
-      var wc = wraps[ci];
-      var wcCanvas = wc.querySelector('.price-chart');
-      var wcId = wc.querySelector('.card-row')._watchId;
+    // draw inline sparklines
+    var sparks = els.list.querySelectorAll('.inline-spark');
+    for (var ci = 0; ci < sparks.length; ci++) {
+      var wcId = sparks[ci].parentNode.querySelector('.card-row')._watchId;
       var wcW = state.watch.find(function (x) { return x.id === wcId; });
-      if (wcCanvas && wcW) {
-        drawChart(wcCanvas, wcW, cardRange[wcId] || '30d');
-      }
+      if (wcW) drawInlineSpark(sparks[ci], wcW);
     }
   }
 
@@ -506,103 +502,17 @@
     x.addEventListener('click', function (ev) { ev.stopPropagation(); removeCard(w.id); });
 
     row.appendChild(grip); row.appendChild(thumb); row.appendChild(info);
+    row.appendChild(spark);
     row.appendChild(quote); row.appendChild(favBtn); row.appendChild(x);
 
-    // ---- chart section ----
-    var chart = document.createElement('div'); chart.className = 'card-chart';
-    var tools = document.createElement('div'); tools.className = 'chart-tools';
-    var range = cardRange[w.id] || '30d';
-    ['7d', '30d', 'All'].forEach(function (rng) {
-      var btn = document.createElement('button');
-      btn.type = 'button'; btn.textContent = rng;
-      btn.classList.toggle('active', range === (rng === 'All' ? 'all' : rng));
-      btn.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        var val = rng === 'All' ? 'all' : rng;
-        cardRange[w.id] = val;
-        tools.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        drawChart(canvas, w, val);
-      });
-      tools.appendChild(btn);
+    // ---- inline sparkline ----
+    var spark = document.createElement('canvas');
+    spark.className = 'inline-spark'; spark.width = 160; spark.height = 64;
+    spark.title = 'Click to open price chart';
+    spark.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      openChartOverlay(w);
     });
-    chart.appendChild(tools);
-    var canvas = document.createElement('canvas');
-    canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 180;
-    chart.appendChild(canvas);
-
-    // hover tracking
-    canvas.addEventListener('mousemove', function (ev) {
-      var rect = canvas.getBoundingClientRect();
-      var mx = ev.clientX - rect.left;
-      var scaleX = canvas.width / rect.width;
-      var data = getChartData(w, cardRange[w.id] || '30d');
-      if (!data.length) return;
-      var pad = { left: 52, right: 14 };
-      var pw = canvas.width - pad.left - pad.right;
-      var nearest = 0; var bestDist = Infinity;
-      for (var di = 0; di < data.length; di++) {
-        var sx = pad.left + (di / Math.max(1, data.length - 1)) * pw;
-        var dist = Math.abs(mx * scaleX - sx);
-        if (dist < bestDist) { bestDist = dist; nearest = di; }
-      }
-      if (bestDist > 35) { nearest = null; els.chartTooltip.hidden = true; }
-      drawChart(canvas, w, cardRange[w.id] || '30d', nearest);
-      if (nearest != null) {
-        var dp = data[nearest];
-        els.chartTooltip.textContent = dp.d + ' — $' + dp.p.toFixed(2);
-        els.chartTooltip.style.left = ev.clientX + 'px';
-        els.chartTooltip.style.top = (ev.clientY - 14) + 'px';
-        els.chartTooltip.hidden = false;
-      }
-    });
-    canvas.addEventListener('mouseleave', function () {
-      drawChart(canvas, w, cardRange[w.id] || '30d');
-      els.chartTooltip.hidden = true;
-    });
-
-    // chart meta: sparkline + 24h + ATH/ATL + volatility
-    var meta = document.createElement('div'); meta.className = 'chart-meta';
-    var bars = document.createElement('div'); bars.className = 'card-bars';
-    bars.title = '30-day sparkline';
-    bars.addEventListener('mouseenter', function (ev) { showSparkTooltip(w, ev); });
-    bars.addEventListener('mouseleave', function () { els.sparkTooltip.hidden = true; });
-    var heights = Poke.sparkBars(w.daily, 30);
-    if (heights.length) {
-      heights.forEach(function (v) {
-        var b = document.createElement('span'); b.className = 'bar';
-        b.style.height = Math.round(v * 18) + 'px'; bars.appendChild(b);
-      });
-    }
-    meta.appendChild(bars);
-
-    var ath = allTimeHigh(w); var atl = allTimeLow(w);
-    if (ath != null && atl != null && ath !== atl && w.price != null) {
-      var pct = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
-      var pb = document.createElement('div'); pb.className = 'card-posbar';
-      var pf = document.createElement('div'); pf.className = 'card-posfill'; pf.style.width = pct + '%';
-      pb.appendChild(pf); meta.appendChild(pb);
-    }
-
-    var dayChg = dayChange(w);
-    if (dayChg != null) {
-      var dc = document.createElement('span'); dc.className = 'card-daychg' + (dayChg > 0 ? ' up' : dayChg < 0 ? ' down' : '');
-      dc.textContent = (dayChg >= 0 ? '+' : '') + Poke.formatPrice(dayChg) + ' 24h'; meta.appendChild(dc);
-    }
-    if (ath != null && atl != null) {
-      var rngEl = document.createElement('span'); rngEl.className = 'card-range';
-      rngEl.textContent = 'H ' + Poke.formatPrice(ath) + ' L ' + Poke.formatPrice(atl); meta.appendChild(rngEl);
-    }
-    if (Array.isArray(w.daily) && w.daily.length >= 2) {
-      var last7d = w.daily.slice(-7); var dmin = Infinity; var dmax = -Infinity;
-      last7d.forEach(function (d) { if (d.p < dmin) dmin = d.p; if (d.p > dmax) dmax = d.p; });
-      if (dmin > 0 && dmax > dmin) {
-        var vol = ((dmax - dmin) / dmin * 100).toFixed(1);
-        var ve = document.createElement('span'); ve.className = 'card-vol';
-        ve.textContent = '±' + vol + '% 7d'; meta.appendChild(ve);
-      }
-    }
-    chart.appendChild(meta);
 
     // ---- alert panel ----
     var panel = document.createElement('div'); panel.className = 'alert-panel'; panel.hidden = true;
@@ -644,18 +554,18 @@
     panel.appendChild(mkAlertRow('Alert if ±%', 'alertPct'));
 
     // range-colored left border
+    var ath = allTimeHigh(w); var atl = allTimeLow(w);
     if (ath != null && atl != null && ath !== atl && w.price != null) {
       var pctBorder = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
       wrap.style.borderLeft = '3px solid hsl(' + (pctBorder * 1.2) + ', 70%, 45%)';
     }
 
     wrap.appendChild(row);
-    wrap.appendChild(chart);
     wrap.appendChild(panel);
 
     // ---- row click opens TCGplayer ----
     row.addEventListener('click', function (ev) {
-      if (ev.target.closest('.alert-btn') || ev.target.closest('.fav-btn') || ev.target.closest('.row-x') || ev.target.closest('.drag-grip') || ev.target.closest('.chart-tools') || ev.target.closest('canvas')) return;
+      if (ev.target.closest('.alert-btn') || ev.target.closest('.fav-btn') || ev.target.closest('.row-x') || ev.target.closest('.drag-grip') || ev.target.closest('.inline-spark')) return;
       if (w.tcgplayerUrl) chrome.windows.create({ type: 'popup', url: w.tcgplayerUrl, width: 900, height: 700 });
     });
     row.addEventListener('keydown', function (ev) {
@@ -985,6 +895,137 @@
     els.sparkTooltip.style.left = Math.min(ev.clientX - 60, window.innerWidth - 170) + 'px';
     els.sparkTooltip.hidden = false;
   }
+
+  // ---------- inline sparkline ----------
+  function drawInlineSpark(canvas, w) {
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width; var H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    if (!Array.isArray(w.daily) || w.daily.length < 2) {
+      ctx.fillStyle = '#6b7c9e'; ctx.font = '8px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('no history', W/2, H/2 + 3);
+      return;
+    }
+    var prices = w.daily.slice(-30).map(function(d){return d.p;});
+    var min = Math.min.apply(null, prices);
+    var max = Math.max.apply(null, prices);
+    var spread = max - min || 1;
+    min -= spread * 0.05; max += spread * 0.05;
+    var yr = max - min || 1;
+    var pad = 4;
+    var pw = W - pad * 2; var ph = H - pad * 2;
+    function x(i) { return pad + (i / Math.max(1, prices.length - 1)) * pw; }
+    function y(p) { return pad + (1 - (p - min) / yr) * ph; }
+
+    // gradient fill
+    var grad = ctx.createLinearGradient(0, pad, 0, H - pad);
+    grad.addColorStop(0, 'rgba(56, 189, 248, 0.3)');
+    grad.addColorStop(1, 'rgba(56, 189, 248, 0.05)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(x(0), H - pad);
+    for (var i = 0; i < prices.length; i++) ctx.lineTo(x(i), y(prices[i]));
+    ctx.lineTo(x(prices.length - 1), H - pad);
+    ctx.closePath(); ctx.fill();
+
+    // line
+    var isUp = prices[prices.length - 1] >= prices[0];
+    ctx.strokeStyle = isUp ? '#4ade80' : '#f87171'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x(0), y(prices[0]));
+    for (var j = 1; j < prices.length; j++) ctx.lineTo(x(j), y(prices[j]));
+    ctx.stroke();
+  }
+
+  // ---------- chart overlay ----------
+  var overlayCard = null;
+  var overlayRange = '30d';
+  var overlayCanvas = document.getElementById('chartOverlayCanvas');
+  var overlayEl = document.getElementById('chartOverlay');
+
+  function openChartOverlay(w) {
+    overlayCard = w;
+    overlayRange = cardRange[w.id] || '30d';
+    document.getElementById('chartOverlayTitle').textContent = w.name + ' · ' + Poke.formatPrice(w.price);
+
+    // Build range buttons
+    var tools = document.getElementById('chartOverlayTools');
+    tools.innerHTML = '';
+    ['7d', '30d', 'All'].forEach(function(rng) {
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = rng;
+      var val = rng === 'All' ? 'all' : rng;
+      btn.classList.toggle('active', overlayRange === val);
+      btn.addEventListener('click', function() {
+        overlayRange = val;
+        cardRange[w.id] = val;
+        tools.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
+        btn.classList.add('active');
+        redrawOverlay();
+      });
+      tools.appendChild(btn);
+    });
+
+    // Meta
+    var meta = document.getElementById('chartOverlayMeta');
+    meta.innerHTML = 'Click the line to see exact prices';
+
+    overlayEl.hidden = false;
+    overlayCanvas.width = overlayEl.querySelector('.chart-overlay-inner').offsetWidth - 24;
+    overlayCanvas.height = 220;
+    redrawOverlay();
+  }
+
+  function redrawOverlay() {
+    if (!overlayCard) return;
+    drawChart(overlayCanvas, overlayCard, overlayRange);
+  }
+
+  // Overlay hover
+  overlayCanvas.addEventListener('mousemove', function(ev) {
+    if (!overlayCard) return;
+    var rect = overlayCanvas.getBoundingClientRect();
+    var mx = ev.clientX - rect.left;
+    var scaleX = overlayCanvas.width / rect.width;
+    var data = getChartData(overlayCard, overlayRange);
+    if (!data.length) return;
+    var pad = { left: 52, right: 14 };
+    var pw = overlayCanvas.width - pad.left - pad.right;
+    var nearest = 0; var bestDist = Infinity;
+    for (var di = 0; di < data.length; di++) {
+      var sx = pad.left + (di / Math.max(1, data.length - 1)) * pw;
+      var dist = Math.abs(mx * scaleX - sx);
+      if (dist < bestDist) { bestDist = dist; nearest = di; }
+    }
+    if (bestDist > 35) { nearest = null; els.chartTooltip.hidden = true; }
+    drawChart(overlayCanvas, overlayCard, overlayRange, nearest);
+    if (nearest != null) {
+      var dp = data[nearest];
+      els.chartTooltip.textContent = dp.d + ' — $' + dp.p.toFixed(2);
+      els.chartTooltip.style.left = ev.clientX + 'px';
+      els.chartTooltip.style.top = (ev.clientY - 14) + 'px';
+      els.chartTooltip.hidden = false;
+      document.getElementById('chartOverlayMeta').textContent = 'Selected: ' + dp.p.toFixed(2) + ' on ' + dp.d;
+    }
+  });
+  overlayCanvas.addEventListener('mouseleave', function() {
+    if (overlayCard) drawChart(overlayCanvas, overlayCard, overlayRange);
+    els.chartTooltip.hidden = true;
+    document.getElementById('chartOverlayMeta').textContent = 'Click the line to see exact prices';
+  });
+
+  // Close overlay
+  document.getElementById('chartOverlayClose').addEventListener('click', function() {
+    overlayEl.hidden = true; overlayCard = null;
+  });
+  overlayEl.addEventListener('click', function(ev) {
+    if (ev.target === overlayEl) { overlayEl.hidden = true; overlayCard = null; }
+  });
+  document.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Escape' && !overlayEl.hidden) {
+      overlayEl.hidden = true; overlayCard = null;
+    }
+  });
 
   // ---------- canvas price chart ----------
   function getChartData(w, range) {

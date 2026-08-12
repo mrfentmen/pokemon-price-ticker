@@ -453,6 +453,57 @@ body.light .card-thumb.ph { border-color: #333; }
 }
 .chart-tooltip[hidden] { display: none; }
 
+/* ---------- chart overlay ---------- */
+.chart-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(7, 11, 22, 0.96);
+  display: flex; align-items: center; justify-content: center;
+}
+.chart-overlay[hidden] { display: none; }
+.chart-overlay-inner {
+  width: 420px; max-width: 100vw; padding: 10px 12px;
+}
+.chart-overlay-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.chart-overlay-head span { font-size: 14px; font-weight: 800; }
+.overlay-close {
+  width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card); color: var(--text); font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.overlay-close:hover { background: var(--down); color: #fff; border-color: var(--down); }
+.chart-overlay-tools {
+  display: flex; gap: 5px; margin-bottom: 6px; justify-content: center;
+}
+.chart-overlay-tools button {
+  padding: 4px 14px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--card); color: var(--muted); font-size: 11px; cursor: pointer; font-weight: 700;
+}
+.chart-overlay-tools button:hover { border-color: var(--accent); color: var(--text); }
+.chart-overlay-tools button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+#chartOverlayCanvas {
+  display: block; width: 100%;
+  background: var(--card); border: 1px solid var(--border); border-radius: 9px;
+}
+.chart-overlay-meta {
+  display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  margin-top: 6px; font-size: 11px; font-variant-numeric: tabular-nums;
+}
+
+/* ---------- inline sparkline in card row ---------- */
+.inline-spark {
+  flex: none; width: 80px; height: 32px;
+  cursor: pointer; border-radius: 5px;
+  background: var(--card2); border: 1px solid var(--border);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.inline-spark:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
 /* ---------- price flash ---------- */
 .card-price.flash-up { animation: flashGreen 0.6s ease; }
 .card-price.flash-down { animation: flashRed 0.6s ease; }
