@@ -144,6 +144,10 @@ body {
 .card-trend.up { color: var(--up); }
 .card-trend.down { color: var(--down); }
 .card-trend.flat { color: var(--muted); }
+.card-daychg { font-size: 9.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.card-daychg.up { color: var(--up); }
+.card-daychg.down { color: var(--down); }
+.card-range { font-size: 8.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 1px; }
 .card-bars { display: flex; align-items: flex-end; gap: 0.5px; height: 18px; flex: none; }
 .card-bars .bar { width: 1px; border-radius: 0; background: var(--accent); opacity: 0.75; }
 .row-x {
@@ -173,6 +177,8 @@ body.compact .card-set { font-size: 9.5px; }
 body.compact .card-price { font-size: 12px; }
 body.compact .card-variant { font-size: 6.5px; }
 body.compact .card-trend { font-size: 9.5px; }
+body.compact .card-daychg { font-size: 8.5px; }
+body.compact .card-range { font-size: 7.5px; }
 body.compact .card-bars { height: 12px; }
 body.compact .card-bars .bar { width: 0.8px; }
 body.compact .alert-btn { width: 20px; height: 20px; font-size: 10px; }
@@ -259,6 +265,22 @@ body.compact .drag-grip { width: 8px; font-size: 9px; }
 @keyframes alertFlash {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+/* ---------- light theme ---------- */
+body.light {
+  --bg: #f0f4ff;
+  --card: #ffffff;
+  --card2: #eef1fb;
+  --text: #1a1d2e;
+  --muted: #6b7394;
+  --accent: #0ea5e9;
+  --accent2: #7c3aed;
+  --border: #d4daf0;
+  --up: #16a34a;
+  --down: #dc2626;
+  --warn: #d97706;
+  background: linear-gradient(180deg, #e8edfa 0%, var(--bg) 100%);
 }
 
 /* ---------- alert log ---------- */
