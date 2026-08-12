@@ -222,15 +222,13 @@ body {
 
 /* ---------- expanded panel ---------- */
 .card-expand {
+  display: none;
   border-top: 1px solid var(--border);
   background: var(--card2);
-  max-height: 0; overflow: hidden;
-  transition: max-height 0.3s ease, padding 0.3s ease;
-  padding: 0 14px;
+  padding: 14px;
 }
 .card-expand.open {
-  max-height: 580px;
-  padding: 14px;
+  display: block;
 }
 
 .expand-top {
@@ -390,7 +388,7 @@ body.compact .card-price { font-size: 12px; }
 body.compact .card-variant { font-size: 6px; }
 body.compact .card-trend { font-size: 9.5px; }
 body.compact .expand-chevron { width: 18px; height: 18px; font-size: 11px; }
-body.compact .card-expand.open { max-height: 480px; padding: 9px; }
+body.compact .card-expand.open { padding: 9px; }
 body.compact .expand-thumb { width: 62px; height: 86px; }
 body.compact .expand-thumb.ph { width: 46px; height: 46px; }
 body.compact .price-chart { height: 160px; }
