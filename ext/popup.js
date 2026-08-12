@@ -43,9 +43,11 @@
     if (lv) els.retry.hidden = false;
   }
 
-  function flashAlert(entry) {
+  function flashAlert(entry, dir) {
     if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
-    els.status.textContent = '🎯 ' + entry.name + ' hit $' + entry.alertAbove.toLocaleString() + ' — now ' + Poke.formatPrice(entry.price) + '!';
+    var threshold = dir === 'above' ? entry.alertAbove : entry.alertBelow;
+    var verb = dir === 'above' ? 'hit' : 'dropped below';
+    els.status.textContent = '🔔 ' + entry.name + ' ' + verb + ' $' + threshold.toLocaleString() + ' — now ' + Poke.formatPrice(entry.price) + '!';
     els.status.classList.remove('error', 'stale-fresh', 'stale-warn', 'stale-old');
     els.status.classList.add('alert');
     els.retry.hidden = true;
@@ -246,8 +248,11 @@
   function applyQuote(id, q) {
     var entry = state.watch.find(function (w) { return w.id === id; });
     if (!entry) return;
-    var crossed = entry.alertAbove != null && entry.price != null &&
-      entry.price < entry.alertAbove && q.price != null && q.price >= entry.alertAbove;
+    var oldPrice = entry.price;
+    var crossedAbove = entry.alertAbove != null && oldPrice != null &&
+      oldPrice < entry.alertAbove && q.price != null && q.price >= entry.alertAbove;
+    var crossedBelow = entry.alertBelow != null && oldPrice != null &&
+      oldPrice > entry.alertBelow && q.price != null && q.price <= entry.alertBelow;
     entry.price = q.price;
     entry.variant = q.variant;
     entry.trend = q.trend;
@@ -256,7 +261,8 @@
     entry.image = q.image || entry.image;
     entry.cmAvg1 = q.cmAvg1; entry.cmAvg7 = q.cmAvg7; entry.cmAvg30 = q.cmAvg30;
     entry.ts = Date.now();
-    if (crossed) flashAlert(entry);
+    if (crossedAbove) flashAlert(entry, 'above');
+    if (crossedBelow) flashAlert(entry, 'below');
     // daily price snapshot (30-day sparkline — update today's entry or push a new day)
     if (q.price != null) {
       if (!entry.daily) entry.daily = [];
@@ -362,8 +368,12 @@
     var alertBtn = document.createElement('button');
     alertBtn.className = 'alert-btn';
     alertBtn.type = 'button';
-    if (w.alertAbove) {
-      alertBtn.title = 'Alert: above $' + w.alertAbove.toLocaleString() + ' (click to change)';
+    var hasAlert = w.alertAbove || w.alertBelow;
+    if (hasAlert) {
+      var parts = [];
+      if (w.alertAbove) parts.push('above $' + w.alertAbove.toLocaleString());
+      if (w.alertBelow) parts.push('below $' + w.alertBelow.toLocaleString());
+      alertBtn.title = 'Alert: ' + parts.join(' · ') + ' (click to change)';
       alertBtn.classList.remove('alert-off');
     } else {
       alertBtn.title = 'Set a price alert';
@@ -375,41 +385,66 @@
     var panel = document.createElement('div');
     panel.className = 'alert-panel';
     panel.hidden = true;
-    var al = document.createElement('span');
-    al.className = 'alert-label'; al.textContent = 'Alert me above $';
-    var ainp = document.createElement('input');
-    ainp.className = 'alert-input'; ainp.type = 'number'; ainp.min = '0.01'; ainp.step = 'any';
-    ainp.value = w.alertAbove || '';
-    ainp.placeholder = (w.price != null ? w.price.toFixed(2) : '0.00');
-    var aset = document.createElement('button');
-    aset.className = 'alert-set'; aset.type = 'button'; aset.textContent = 'Set';
-    var aclr = document.createElement('button');
-    aclr.className = 'alert-clear'; aclr.type = 'button'; aclr.textContent = 'Clear';
-    panel.appendChild(al); panel.appendChild(ainp); panel.appendChild(aset); panel.appendChild(aclr);
+
+    function mkRow(label, key) {
+      var row = document.createElement('div');
+      row.className = 'alert-row';
+      var al = document.createElement('span');
+      al.className = 'alert-label'; al.textContent = label;
+      var ainp = document.createElement('input');
+      ainp.className = 'alert-input'; ainp.type = 'number'; ainp.min = '0.01'; ainp.step = 'any';
+      ainp.value = (w[key] || '');
+      ainp.placeholder = (w.price != null ? w.price.toFixed(2) : '0.00');
+      var aset = document.createElement('button');
+      aset.className = 'alert-set'; aset.type = 'button'; aset.textContent = 'Set';
+      var aclr = document.createElement('button');
+      aclr.className = 'alert-clear'; aclr.type = 'button'; aclr.textContent = 'Clear';
+      row.appendChild(al); row.appendChild(ainp); row.appendChild(aset); row.appendChild(aclr);
+
+      aset.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var v = parseFloat(ainp.value);
+        if (isNaN(v) || v <= 0) { panel.hidden = true; return; }
+        w[key] = v;
+        updateAlertBtn();
+        panel.hidden = true;
+        save();
+      });
+      aclr.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        w[key] = null;
+        ainp.value = '';
+        updateAlertBtn();
+        panel.hidden = true;
+        save();
+      });
+      return row;
+    }
+
+    function updateAlertBtn() {
+      var has = w.alertAbove || w.alertBelow;
+      if (has) {
+        var p = [];
+        if (w.alertAbove) p.push('above $' + w.alertAbove.toLocaleString());
+        if (w.alertBelow) p.push('below $' + w.alertBelow.toLocaleString());
+        alertBtn.title = 'Alert: ' + p.join(' · ') + ' (click to change)';
+        alertBtn.classList.remove('alert-off');
+      } else {
+        alertBtn.title = 'Set a price alert';
+        alertBtn.classList.add('alert-off');
+      }
+    }
+
+    panel.appendChild(mkRow('Alert above $', 'alertAbove'));
+    panel.appendChild(mkRow('Alert below $', 'alertBelow'));
 
     alertBtn.addEventListener('click', function (ev) {
       ev.stopPropagation();
       panel.hidden = !panel.hidden;
-      if (!panel.hidden) ainp.focus();
-    });
-    aset.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      var v = parseFloat(ainp.value);
-      if (isNaN(v) || v <= 0) { panel.hidden = true; return; }
-      w.alertAbove = v;
-      alertBtn.title = 'Alert: above $' + v.toLocaleString() + ' (click to change)';
-      alertBtn.classList.remove('alert-off');
-      panel.hidden = true;
-      save();
-    });
-    aclr.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      w.alertAbove = null;
-      alertBtn.title = 'Set a price alert';
-      alertBtn.classList.add('alert-off');
-      ainp.value = '';
-      panel.hidden = true;
-      save();
+      if (!panel.hidden) {
+        var firstInput = panel.querySelector('.alert-input');
+        if (firstInput) firstInput.focus();
+      }
     });
 
     var wrap = document.createElement('div');
