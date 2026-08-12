@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PokéTicker: Pokémon Card Prices",
   "description": "Search any Pokémon card and watch its market price like a stock ticker.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "action": {
     "default_title": "PokéTicker: Pokémon Card Prices",
     "default_popup": "popup.html",

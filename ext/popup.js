@@ -915,7 +915,7 @@
     ctx.clearRect(0, 0, W, H);
     if (!Array.isArray(w.daily) || w.daily.length < 2) {
       ctx.fillStyle = '#6b7c9e'; ctx.font = '8px -apple-system, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('no history', W/2, H/2 + 3);
+      ctx.fillText(w.daily && w.daily.length ? '1 snapshot saved' : 'collecting snapshots', W / 2, H / 2 + 1);
       return;
     }
     var prices = w.daily.slice(-30).map(function(d){return d.p;});
@@ -965,18 +965,23 @@
   }
 
   function setOverlayHint() {
-    overlayMeta.textContent = 'Use Left/Right arrows to inspect prices; Home and End jump to the edges.';
+    var count = overlayCard ? overlayData().length : 0;
+    overlayMeta.textContent = count < 2
+      ? (count ? '1 real snapshot saved — the next point will appear after the next daily refresh.' : 'No real price snapshots saved yet.')
+      : 'Use Left/Right arrows to inspect prices; Home and End jump to the edges.';
     if (overlayCard) {
-      overlayCanvas.setAttribute('aria-label', 'Interactive price chart for ' + overlayCard.name + '. Use the arrow keys to inspect daily prices.');
+      overlayCanvas.setAttribute('aria-label', count < 2
+        ? 'Interactive price chart for ' + overlayCard.name + '. ' + (count ? 'One real snapshot is saved; another appears after the next daily refresh.' : 'No price snapshots are saved yet.')
+        : 'Interactive price chart for ' + overlayCard.name + '. Use the arrow keys to inspect daily prices.');
     }
   }
 
   function selectOverlayPoint(index) {
     var data = overlayData();
-    if (!data.length) {
+    if (data.length < 2) {
       overlayPointIndex = null;
       drawChart(overlayCanvas, overlayCard, overlayRange);
-      overlayMeta.textContent = 'No price history is available for this range.';
+      setOverlayHint();
       return;
     }
     overlayPointIndex = Math.max(0, Math.min(data.length - 1, index));
@@ -1053,7 +1058,7 @@
     var mx = ev.clientX - rect.left;
     var scaleX = overlayCanvas.width / rect.width;
     var data = overlayData();
-    if (!data.length) return;
+    if (data.length < 2) return;
     var pad = { left: 52, right: 14 };
     var pw = overlayCanvas.width - pad.left - pad.right;
     var nearest = 0; var bestDist = Infinity;
@@ -1149,11 +1154,13 @@
   function drawChart(canvas, w, range, hoverIdx) {
     var data = getChartData(w, range);
     var ctx = canvas.getContext('2d');
-    if (!data.length) {
+    if (data.length < 2) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#1e2c4d'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#6b7c9e'; ctx.font = '13px -apple-system, sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Price history builds daily — check back tomorrow', canvas.width / 2, canvas.height / 2);
+      ctx.fillStyle = '#d7e3fa'; ctx.font = 'bold 13px -apple-system, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(data.length ? '1 real snapshot saved' : 'No price snapshots yet', canvas.width / 2, canvas.height / 2 - 8);
+      ctx.fillStyle = '#6b7c9e'; ctx.font = '11px -apple-system, sans-serif';
+      ctx.fillText(data.length ? 'The next point arrives after the next daily refresh' : 'Open the extension to collect today’s price', canvas.width / 2, canvas.height / 2 + 14);
       return;
     }
     var W = canvas.width; var H = canvas.height;
