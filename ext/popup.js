@@ -33,6 +33,7 @@
     ctxMenu: document.getElementById('ctxMenu'),
     refreshAge: document.getElementById('refreshAge'),
     sparkTooltip: document.getElementById('sparkTooltip'),
+    chartTooltip: document.getElementById('chartTooltip'),
     recentSearches: document.getElementById('recentSearches'),
     snoozeBtn: document.getElementById('snoozeBtn'),
     copyAll: document.getElementById('copyAll')
@@ -525,6 +526,40 @@
     var canvas = document.createElement('canvas');
     canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 200;
     chartSec.appendChild(canvas);
+
+    // hover tracking on chart
+    canvas.addEventListener('mousemove', function (ev) {
+      var rect = canvas.getBoundingClientRect();
+      var mx = ev.clientX - rect.left;
+      var my = ev.clientY - rect.top;
+      var scaleX = canvas.width / rect.width;
+      var scaleY = canvas.height / rect.height;
+      var data = getChartData(w, expandedRange[w.id] || '30d');
+      if (!data.length) return;
+      var pad = { left: 52, right: 14 };
+      var pw = canvas.width - pad.left - pad.right;
+      // find nearest data point
+      var nearest = 0; var bestDist = Infinity;
+      for (var di = 0; di < data.length; di++) {
+        var sx = pad.left + (di / Math.max(1, data.length - 1)) * pw;
+        var dist = Math.abs(mx * scaleX - sx);
+        if (dist < bestDist) { bestDist = dist; nearest = di; }
+      }
+      // only show if close enough (within 30px scaled)
+      if (bestDist > 35) { nearest = null; els.chartTooltip.hidden = true; }
+      drawChart(canvas, w, expandedRange[w.id] || '30d', nearest);
+      if (nearest != null) {
+        var dp = data[nearest];
+        els.chartTooltip.textContent = dp.d + ' — $' + dp.p.toFixed(2);
+        els.chartTooltip.style.left = ev.clientX + 'px';
+        els.chartTooltip.style.top = (ev.clientY - 14) + 'px';
+        els.chartTooltip.hidden = false;
+      }
+    });
+    canvas.addEventListener('mouseleave', function () {
+      drawChart(canvas, w, expandedRange[w.id] || '30d');
+      els.chartTooltip.hidden = true;
+    });
     // Chart drawn synchronously in render() after DOM append — skip here
 
     // expand bottom: sparkline + posbar
@@ -996,7 +1031,7 @@
     });
   }
 
-  function drawChart(canvas, w, range) {
+  function drawChart(canvas, w, range, hoverIdx) {
     var data = getChartData(w, range);
     var ctx = canvas.getContext('2d');
     if (!data.length) {
@@ -1068,6 +1103,22 @@
     for (var l = 0; l < labelCount; l++) {
       var idx = Math.floor(l * (data.length - 1) / Math.max(1, labelCount - 1));
       ctx.fillText(data[idx].d.slice(5), x(idx), H - 8);
+    }
+
+    // ---- hover highlight ----
+    if (hoverIdx != null && hoverIdx >= 0 && hoverIdx < data.length) {
+      var hx = x(hoverIdx); var hy = y(prices[hoverIdx]);
+      // vertical guide line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(hx, pad.top); ctx.lineTo(hx, H - pad.bottom); ctx.stroke();
+      ctx.setLineDash([]);
+      // outer glow ring
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.3)'; ctx.beginPath(); ctx.arc(hx, hy, 6, 0, Math.PI * 2); ctx.fill();
+      // inner dot
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, Math.PI * 2); ctx.stroke();
     }
   }
 
