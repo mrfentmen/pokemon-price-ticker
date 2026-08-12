@@ -47,8 +47,7 @@
   var countdownTimer = null;
   var dragIdx = -1;
   var compact = false;
-  var expandedId = null;
-  var expandedRange = {};
+  var cardRange = {};   // per-card chart range: '7d' | '30d' | 'all'
 
   var chimeCtx = null;
   function chime() {
@@ -352,10 +351,6 @@
 
   // ---------- rendering ----------
   function render() {
-    // preserve expansion state across re-renders
-    var prevExpanded = expandedId;
-    expandedId = null;
-
     els.empty.hidden = state.watch.length > 0;
     els.tapeWrap.hidden = state.watch.length === 0;
     els.clearAll.hidden = state.watch.length === 0;
@@ -384,51 +379,28 @@
 
     els.list.innerHTML = '';
     sorted.forEach(function (w) {
-      // restore expanded state
-      if (w.id === prevExpanded) expandedId = w.id;
       els.list.appendChild(rowFor(w));
     });
 
-    // draw chart synchronously — DOM is fully populated now
-    if (expandedId) {
-      var chartWrap = els.list.querySelector('.card-wrap.expanded');
-      if (!chartWrap) { setStatus('DEBUG: no .card-wrap.expanded found', true); }
-      else {
-        var chartCanvas = chartWrap.querySelector('.price-chart');
-        var chartW = state.watch.find(function (x) { return x.id === expandedId; });
-        if (!chartCanvas) { setStatus('DEBUG: no canvas found', true); }
-        else if (!chartW) { setStatus('DEBUG: watch entry not found for ' + expandedId, true); }
-        else {
-          setStatus('DEBUG: drawing chart for ' + chartW.name + ' with ' + (chartW.daily ? chartW.daily.length : 0) + ' daily pts');
-          var chartRange = expandedRange[expandedId] || '30d';
-          drawChart(chartCanvas, chartW, chartRange);
-          var chartTools = chartWrap.querySelector('.chart-tools');
-          if (chartTools) {
-            chartTools.querySelectorAll('button').forEach(function (b) {
-              b.classList.toggle('active', b.textContent.trim() === (chartRange === '7d' ? '7d' : chartRange === '30d' ? '30d' : 'All'));
-            });
-          }
-        }
+    // draw all charts now that DOM is populated
+    var wraps = els.list.querySelectorAll('.card-wrap');
+    for (var ci = 0; ci < wraps.length; ci++) {
+      var wc = wraps[ci];
+      var wcCanvas = wc.querySelector('.price-chart');
+      var wcId = wc.querySelector('.card-row')._watchId;
+      var wcW = state.watch.find(function (x) { return x.id === wcId; });
+      if (wcCanvas && wcW) {
+        drawChart(wcCanvas, wcW, cardRange[wcId] || '30d');
       }
     }
   }
 
-  // ---------- Poké Ball placeholder ----------
-  function pokePlaceholder(size) {
-    var d = document.createElement('div');
-    d.className = size === 'big' ? 'expand-thumb ph' : 'card-thumb ph';
-    return d;
-  }
-
-  // ---------- accordion card row ----------
+  // ---------- flat card row with chart always visible ----------
   function rowFor(w) {
-    var isExpanded = (expandedId === w.id);
-
     var wrap = document.createElement('div');
     wrap.className = 'card-wrap';
-    if (isExpanded) wrap.classList.add('expanded');
 
-    // ---- collapsed row ----
+    // ---- top row ----
     var row = document.createElement('article');
     row.className = 'card-row';
     row.tabIndex = 0;
@@ -439,7 +411,8 @@
     var thumb = document.createElement('img');
     thumb.className = 'card-thumb'; thumb.alt = ''; thumb.loading = 'lazy'; thumb.src = w.image;
     thumb.addEventListener('error', function () {
-      thumb.replaceWith(pokePlaceholder('small'));
+      var ph = document.createElement('div'); ph.className = 'card-thumb ph';
+      thumb.replaceWith(ph);
     });
 
     var info = document.createElement('div'); info.className = 'card-info';
@@ -461,97 +434,59 @@
     var grip = document.createElement('span'); grip.className = 'drag-grip';
     grip.textContent = '⋮⋮'; grip.title = 'Drag to reorder';
 
-    var chevron = document.createElement('button');
-    chevron.className = 'expand-chevron'; chevron.type = 'button';
-    chevron.title = isExpanded ? 'Collapse details' : 'Expand details';
-    chevron.textContent = '▼';
+    var favBtn = document.createElement('button');
+    favBtn.className = 'fav-btn' + (w.fav ? ' fav-on' : ''); favBtn.type = 'button';
+    favBtn.title = w.fav ? 'Unpin from top' : 'Pin to top';
+    favBtn.textContent = w.fav ? '⭐' : '☆';
+    favBtn.addEventListener('click', function (ev) { ev.stopPropagation(); w.fav = !w.fav; save(); render(); });
+
+    var x = document.createElement('button'); x.className = 'row-x'; x.type = 'button';
+    x.title = 'Remove from ticker'; x.textContent = '✕';
+    x.addEventListener('click', function (ev) { ev.stopPropagation(); removeCard(w.id); });
 
     row.appendChild(grip); row.appendChild(thumb); row.appendChild(info);
-    row.appendChild(quote); row.appendChild(chevron);
+    row.appendChild(quote); row.appendChild(favBtn); row.appendChild(x);
 
-    // ---- expanded panel ----
-    var expand = document.createElement('div');
-    expand.className = 'card-expand';
-    if (isExpanded) expand.classList.add('open');
-
-    // expand top: large thumb + details
-    var expandTop = document.createElement('div'); expandTop.className = 'expand-top';
-    var bigThumb = document.createElement('img');
-    bigThumb.className = 'expand-thumb'; bigThumb.alt = ''; bigThumb.src = w.image;
-    bigThumb.addEventListener('error', function () { bigThumb.replaceWith(pokePlaceholder('big')); });
-    var details = document.createElement('div'); details.className = 'expand-details';
-    var detName = document.createElement('div'); detName.className = 'det-name'; detName.textContent = w.name + (w.number ? ' · #' + w.number : '');
-    var detSet = document.createElement('div'); detSet.className = 'det-set'; detSet.textContent = (w.set || '') + (w.updatedAt ? ' · Updated ' + w.updatedAt : '');
-    details.appendChild(detName); details.appendChild(detSet);
-
-    // detail rows: 24h, ATH/ATL, volatility
-    var detRow = document.createElement('div'); detRow.className = 'expand-detail-row';
-    var dayChg = dayChange(w);
-    if (dayChg != null) {
-      var dc = document.createElement('span'); dc.className = 'card-daychg' + (dayChg > 0 ? ' up' : dayChg < 0 ? ' down' : '');
-      dc.textContent = (dayChg >= 0 ? '+' : '') + Poke.formatPrice(dayChg) + ' 24h'; detRow.appendChild(dc);
-    }
-    var ath = allTimeHigh(w); var atl = allTimeLow(w);
-    if (ath != null && atl != null) {
-      var rng = document.createElement('span'); rng.className = 'card-range';
-      rng.textContent = 'H ' + Poke.formatPrice(ath) + '  L ' + Poke.formatPrice(atl); detRow.appendChild(rng);
-    }
-    if (Array.isArray(w.daily) && w.daily.length >= 2) {
-      var last7d = w.daily.slice(-7); var dmin = Infinity; var dmax = -Infinity;
-      last7d.forEach(function (d) { if (d.p < dmin) dmin = d.p; if (d.p > dmax) dmax = d.p; });
-      if (dmin > 0 && dmax > dmin) {
-        var vol = ((dmax - dmin) / dmin * 100).toFixed(1);
-        var volEl = document.createElement('span'); volEl.className = 'card-vol';
-        volEl.textContent = '±' + vol + '% 7d'; detRow.appendChild(volEl);
-      }
-    }
-    details.appendChild(detRow);
-
-    expandTop.appendChild(bigThumb); expandTop.appendChild(details);
-
-    // chart section
-    var chartSec = document.createElement('div'); chartSec.className = 'chart-section';
-    var chartTools = document.createElement('div'); chartTools.className = 'chart-tools';
+    // ---- chart section ----
+    var chart = document.createElement('div'); chart.className = 'card-chart';
+    var tools = document.createElement('div'); tools.className = 'chart-tools';
+    var range = cardRange[w.id] || '30d';
     ['7d', '30d', 'All'].forEach(function (rng) {
       var btn = document.createElement('button');
       btn.type = 'button'; btn.textContent = rng;
-      btn.classList.toggle('active', (expandedRange[w.id] || '30d') === (rng === 'All' ? 'all' : rng));
+      btn.classList.toggle('active', range === (rng === 'All' ? 'all' : rng));
       btn.addEventListener('click', function (ev) {
         ev.stopPropagation();
         var val = rng === 'All' ? 'all' : rng;
-        expandedRange[w.id] = val;
-        chartTools.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+        cardRange[w.id] = val;
+        tools.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         drawChart(canvas, w, val);
       });
-      chartTools.appendChild(btn);
+      tools.appendChild(btn);
     });
-    chartSec.appendChild(chartTools);
+    chart.appendChild(tools);
     var canvas = document.createElement('canvas');
-    canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 200;
-    chartSec.appendChild(canvas);
+    canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 180;
+    chart.appendChild(canvas);
 
-    // hover tracking on chart
+    // hover tracking
     canvas.addEventListener('mousemove', function (ev) {
       var rect = canvas.getBoundingClientRect();
       var mx = ev.clientX - rect.left;
-      var my = ev.clientY - rect.top;
       var scaleX = canvas.width / rect.width;
-      var scaleY = canvas.height / rect.height;
-      var data = getChartData(w, expandedRange[w.id] || '30d');
+      var data = getChartData(w, cardRange[w.id] || '30d');
       if (!data.length) return;
       var pad = { left: 52, right: 14 };
       var pw = canvas.width - pad.left - pad.right;
-      // find nearest data point
       var nearest = 0; var bestDist = Infinity;
       for (var di = 0; di < data.length; di++) {
         var sx = pad.left + (di / Math.max(1, data.length - 1)) * pw;
         var dist = Math.abs(mx * scaleX - sx);
         if (dist < bestDist) { bestDist = dist; nearest = di; }
       }
-      // only show if close enough (within 30px scaled)
       if (bestDist > 35) { nearest = null; els.chartTooltip.hidden = true; }
-      drawChart(canvas, w, expandedRange[w.id] || '30d', nearest);
+      drawChart(canvas, w, cardRange[w.id] || '30d', nearest);
       if (nearest != null) {
         var dp = data[nearest];
         els.chartTooltip.textContent = dp.d + ' — $' + dp.p.toFixed(2);
@@ -561,13 +496,12 @@
       }
     });
     canvas.addEventListener('mouseleave', function () {
-      drawChart(canvas, w, expandedRange[w.id] || '30d');
+      drawChart(canvas, w, cardRange[w.id] || '30d');
       els.chartTooltip.hidden = true;
     });
-    // Chart drawn synchronously in render() after DOM append — skip here
 
-    // expand bottom: sparkline + posbar
-    var expandBottom = document.createElement('div'); expandBottom.className = 'expand-bottom';
+    // chart meta: sparkline + 24h + ATH/ATL + volatility
+    var meta = document.createElement('div'); meta.className = 'chart-meta';
     var bars = document.createElement('div'); bars.className = 'card-bars';
     bars.title = '30-day sparkline';
     bars.addEventListener('mouseenter', function (ev) { showSparkTooltip(w, ev); });
@@ -576,122 +510,91 @@
     if (heights.length) {
       heights.forEach(function (v) {
         var b = document.createElement('span'); b.className = 'bar';
-        b.style.height = Math.round(v * 24) + 'px'; bars.appendChild(b);
+        b.style.height = Math.round(v * 18) + 'px'; bars.appendChild(b);
       });
     }
-    expandBottom.appendChild(bars);
+    meta.appendChild(bars);
 
+    var ath = allTimeHigh(w); var atl = allTimeLow(w);
     if (ath != null && atl != null && ath !== atl && w.price != null) {
       var pct = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
-      var posBar = document.createElement('div'); posBar.className = 'card-posbar';
-      var fill = document.createElement('div'); fill.className = 'card-posfill';
-      fill.style.width = pct + '%'; posBar.appendChild(fill); expandBottom.appendChild(posBar);
+      var pb = document.createElement('div'); pb.className = 'card-posbar';
+      var pf = document.createElement('div'); pf.className = 'card-posfill'; pf.style.width = pct + '%';
+      pb.appendChild(pf); meta.appendChild(pb);
     }
 
-    // expand actions
-    var actions = document.createElement('div'); actions.className = 'expand-actions';
+    var dayChg = dayChange(w);
+    if (dayChg != null) {
+      var dc = document.createElement('span'); dc.className = 'card-daychg' + (dayChg > 0 ? ' up' : dayChg < 0 ? ' down' : '');
+      dc.textContent = (dayChg >= 0 ? '+' : '') + Poke.formatPrice(dayChg) + ' 24h'; meta.appendChild(dc);
+    }
+    if (ath != null && atl != null) {
+      var rngEl = document.createElement('span'); rngEl.className = 'card-range';
+      rngEl.textContent = 'H ' + Poke.formatPrice(ath) + ' L ' + Poke.formatPrice(atl); meta.appendChild(rngEl);
+    }
+    if (Array.isArray(w.daily) && w.daily.length >= 2) {
+      var last7d = w.daily.slice(-7); var dmin = Infinity; var dmax = -Infinity;
+      last7d.forEach(function (d) { if (d.p < dmin) dmin = d.p; if (d.p > dmax) dmax = d.p; });
+      if (dmin > 0 && dmax > dmin) {
+        var vol = ((dmax - dmin) / dmin * 100).toFixed(1);
+        var ve = document.createElement('span'); ve.className = 'card-vol';
+        ve.textContent = '±' + vol + '% 7d'; meta.appendChild(ve);
+      }
+    }
+    chart.appendChild(meta);
 
-    var favBtn = document.createElement('button');
-    favBtn.className = 'btn-sm'; favBtn.type = 'button';
-    favBtn.textContent = w.fav ? '⭐ Unpin' : '☆ Pin';
-    favBtn.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      w.fav = !w.fav; save(); render();
-    });
-    actions.appendChild(favBtn);
+    // ---- alert panel ----
+    var panel = document.createElement('div'); panel.className = 'alert-panel'; panel.hidden = true;
 
-    var alertToggle = document.createElement('button');
-    alertToggle.className = 'btn-sm accent'; alertToggle.type = 'button';
-    alertToggle.textContent = (w.alertAbove || w.alertBelow || w.alertPct) ? '🔔 Edit alerts' : '🔔 Set alert';
-    alertToggle.addEventListener('click', function (ev) {
+    var alertBtn = document.createElement('button');
+    alertBtn.className = 'alert-btn'; alertBtn.type = 'button';
+    var hasAlert = w.alertAbove || w.alertBelow || w.alertPct;
+    if (hasAlert) { alertBtn.classList.remove('alert-off'); alertBtn.title = 'Edit alerts'; }
+    else { alertBtn.classList.add('alert-off'); alertBtn.title = 'Set price alert'; }
+    alertBtn.textContent = '🔔';
+    alertBtn.addEventListener('click', function (ev) {
       ev.stopPropagation();
       panel.hidden = !panel.hidden;
       if (!panel.hidden) { var fi = panel.querySelector('.alert-input'); if (fi) fi.focus(); }
     });
-    actions.appendChild(alertToggle);
+    row.appendChild(alertBtn);
 
-    var openLink = document.createElement('button');
-    openLink.className = 'btn-sm'; openLink.type = 'button';
-    openLink.textContent = '↗ View on TCGplayer';
-    openLink.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      if (w.tcgplayerUrl) chrome.windows.create({ type: 'popup', url: w.tcgplayerUrl, width: 900, height: 700 });
-    });
-    actions.appendChild(openLink);
-
-    var remBtn = document.createElement('button');
-    remBtn.className = 'btn-sm danger'; remBtn.type = 'button';
-    remBtn.textContent = '✕ Remove';
-    remBtn.addEventListener('click', function (ev) { ev.stopPropagation(); removeCard(w.id); });
-    actions.appendChild(remBtn);
-
-    // alert panel
-    var panel = document.createElement('div'); panel.className = 'alert-panel'; panel.hidden = true;
     function mkAlertRow(label, key) {
       var ar = document.createElement('div'); ar.className = 'alert-row';
       var al = document.createElement('span'); al.className = 'alert-label'; al.textContent = label;
       var ainp = document.createElement('input'); ainp.className = 'alert-input'; ainp.type = 'number'; ainp.min = '0.01'; ainp.step = 'any';
       ainp.value = (w[key] || '');
       ainp.placeholder = key === 'alertPct' ? '10' : (w.price != null ? w.price.toFixed(2) : '0.00');
-      if (key === 'alertPct') ainp.title = 'Current base: ' + (w.alertPctBase != null ? Poke.formatPrice(w.alertPctBase) : 'not set');
+      if (key === 'alertPct') ainp.title = 'Base: ' + (w.alertPctBase != null ? Poke.formatPrice(w.alertPctBase) : 'not set');
       var aset = document.createElement('button'); aset.className = 'alert-set'; aset.type = 'button'; aset.textContent = 'Set';
       var aclr = document.createElement('button'); aclr.className = 'alert-clear'; aclr.type = 'button'; aclr.textContent = 'Clear';
       ar.appendChild(al); ar.appendChild(ainp); ar.appendChild(aset); ar.appendChild(aclr);
-      aset.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        var v = parseFloat(ainp.value);
-        if (isNaN(v) || v <= 0) { panel.hidden = true; return; }
-        w[key] = v;
-        if (key === 'alertPct') w.alertPctBase = w.price;
-        updateAlertLabel(); panel.hidden = true; save();
-      });
-      aclr.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        w[key] = null;
-        if (key === 'alertPct') w.alertPctBase = null;
-        ainp.value = ''; updateAlertLabel(); panel.hidden = true; save();
-      });
+      aset.addEventListener('click', function (ev) { ev.stopPropagation(); var v = parseFloat(ainp.value); if (isNaN(v) || v <= 0) { panel.hidden = true; return; } w[key] = v; if (key === 'alertPct') w.alertPctBase = w.price; updateAlertBtn(); panel.hidden = true; save(); });
+      aclr.addEventListener('click', function (ev) { ev.stopPropagation(); w[key] = null; if (key === 'alertPct') w.alertPctBase = null; ainp.value = ''; updateAlertBtn(); panel.hidden = true; save(); });
       return ar;
     }
-    function updateAlertLabel() {
+    function updateAlertBtn() {
       var has = w.alertAbove || w.alertBelow || w.alertPct;
-      alertToggle.textContent = has ? '🔔 Edit alerts' : '🔔 Set alert';
+      if (has) { alertBtn.classList.remove('alert-off'); alertBtn.title = 'Edit alerts'; }
+      else { alertBtn.classList.add('alert-off'); alertBtn.title = 'Set price alert'; }
     }
     panel.appendChild(mkAlertRow('Alert above $', 'alertAbove'));
     panel.appendChild(mkAlertRow('Alert below $', 'alertBelow'));
     panel.appendChild(mkAlertRow('Alert if ±%', 'alertPct'));
 
-    // assemble expand
-    expand.appendChild(expandTop);
-    expand.appendChild(chartSec);
-    expand.appendChild(expandBottom);
-    expand.appendChild(actions);
-    expand.appendChild(panel);
-
-    // range-colored left border on wrap
+    // range-colored left border
     if (ath != null && atl != null && ath !== atl && w.price != null) {
       var pctBorder = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
-      var hue = pctBorder * 1.2;
-      wrap.style.borderLeft = '3px solid hsl(' + hue + ', 70%, 45%)';
-      row.style.paddingLeft = '7px';
+      wrap.style.borderLeft = '3px solid hsl(' + (pctBorder * 1.2) + ', 70%, 45%)';
     }
 
     wrap.appendChild(row);
-    wrap.appendChild(expand);
-
-    // ---- chevron toggles expand ----
-    chevron.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      if (expandedId === w.id) {
-        expandedId = null; render();
-      } else {
-        expandedId = w.id; render();
-      }
-    });
+    wrap.appendChild(chart);
+    wrap.appendChild(panel);
 
     // ---- row click opens TCGplayer ----
     row.addEventListener('click', function (ev) {
-      if (ev.target.closest('.expand-chevron') || ev.target.closest('.drag-grip')) return;
+      if (ev.target.closest('.alert-btn') || ev.target.closest('.fav-btn') || ev.target.closest('.row-x') || ev.target.closest('.drag-grip') || ev.target.closest('.chart-tools') || ev.target.closest('canvas')) return;
       if (w.tcgplayerUrl) chrome.windows.create({ type: 'popup', url: w.tcgplayerUrl, width: 900, height: 700 });
     });
     row.addEventListener('keydown', function (ev) {
@@ -701,7 +604,7 @@
       }
     });
 
-    // ---- right-click context menu ----
+    // ---- right-click ----
     row.addEventListener('contextmenu', function (ev) {
       ev.preventDefault();
       ctxTarget = w;
@@ -909,7 +812,7 @@
   els.refresh.addEventListener('click', refreshAll);
   els.retry.addEventListener('click', refreshAll);
   els.clearAll.addEventListener('click', function () {
-    state.watch = []; expandedId = null; save(); setStatus('Cleared your ticker'); render();
+    state.watch = []; save(); setStatus('Cleared your ticker'); render();
   });
 
   // ---------- context menu ----------
