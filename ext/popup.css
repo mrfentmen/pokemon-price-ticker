@@ -353,3 +353,23 @@ body.light {
 .ctx-item:hover { background: rgba(56, 189, 248, 0.15); }
 .ctx-danger { color: var(--down); }
 .ctx-danger:hover { background: rgba(248, 113, 113, 0.15); }
+
+/* ---------- spark tooltip ---------- */
+.spark-tooltip {
+  position: fixed; z-index: 90;
+  background: var(--card2); border: 1px solid var(--border); border-radius: 9px;
+  padding: 8px 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  min-width: 140px;
+}
+.spark-tooltip[hidden] { display: none; }
+.spark-title { font-size: 9px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.spark-bars { display: flex; align-items: flex-end; gap: 3px; height: 42px; }
+.spark-bar-wrap { flex: 1; display: flex; align-items: flex-end; }
+.spark-bar { width: 100%; min-height: 2px; background: var(--accent); border-radius: 1px; opacity: 0.8; }
+.spark-summary { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 4px; color: var(--text); }
+
+/* ---------- price flash ---------- */
+.card-price.flash-up { animation: flashGreen 0.6s ease; }
+.card-price.flash-down { animation: flashRed 0.6s ease; }
+@keyframes flashGreen { 0% { background: rgba(74, 222, 128, 0.35); } 100% { background: transparent; } }
+@keyframes flashRed { 0% { background: rgba(248, 113, 113, 0.35); } 100% { background: transparent; } }

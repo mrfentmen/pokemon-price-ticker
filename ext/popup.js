@@ -30,7 +30,8 @@
     compactToggle: document.getElementById('compactToggle'),
     themeToggle: document.getElementById('themeToggle'),
     ctxMenu: document.getElementById('ctxMenu'),
-    refreshAge: document.getElementById('refreshAge')
+    refreshAge: document.getElementById('refreshAge'),
+    sparkTooltip: document.getElementById('sparkTooltip')
   };
 
   var ctxTarget = null;
@@ -298,6 +299,7 @@
       oldPrice < entry.alertAbove && q.price != null && q.price >= entry.alertAbove;
     var crossedBelow = entry.alertBelow != null && oldPrice != null &&
       oldPrice > entry.alertBelow && q.price != null && q.price <= entry.alertBelow;
+    var priceChanged = oldPrice != null && q.price != null && oldPrice !== q.price;
     entry.price = q.price;
     entry.variant = q.variant;
     entry.trend = q.trend;
@@ -326,6 +328,22 @@
     }
     save();
     render();
+    // flash the price element after render
+    if (oldPrice != null && q.price != null && oldPrice !== q.price) {
+      setTimeout(function () {
+        var rows = els.list.querySelectorAll('.card-row');
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i]._watchId === id) {
+            var priceEl = rows[i].querySelector('.card-price');
+            if (priceEl) {
+              priceEl.classList.add(q.price > oldPrice ? 'flash-up' : 'flash-down');
+              setTimeout(function () { priceEl.classList.remove('flash-up', 'flash-down'); }, 600);
+            }
+            break;
+          }
+        }
+      }, 10);
+    }
   }
 
   // ---------- rendering ----------
@@ -364,6 +382,7 @@
     row.tabIndex = 0;
     row.setAttribute('role', 'button');
     row.title = w.tcgplayerUrl ? 'Open on TCGplayer' : w.name;
+    row._watchId = w.id;
 
     var thumb = document.createElement('img');
     thumb.className = 'card-thumb';
@@ -437,6 +456,12 @@
     var bars = document.createElement('div');
     bars.className = 'card-bars';
     bars.title = '30-day price sparkline';
+    bars.addEventListener('mouseenter', function (ev) {
+      showSparkTooltip(w, ev);
+    });
+    bars.addEventListener('mouseleave', function () {
+      els.sparkTooltip.hidden = true;
+    });
     var heights = Poke.sparkBars(w.daily, 30);
     if (heights.length) {
       heights.forEach(function (v) {
@@ -584,6 +609,16 @@
     wrap.appendChild(row);
     wrap.appendChild(panel);
 
+    row.addEventListener('dblclick', function (ev) {
+      if (ev.target.closest('.alert-btn') || ev.target.closest('.row-x') || ev.target.closest('.fav-btn') || ev.target.closest('.drag-grip')) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) {
+        var firstInput = panel.querySelector('.alert-input');
+        if (firstInput) firstInput.focus();
+      }
+    });
     row.addEventListener('contextmenu', function (ev) {
       ev.preventDefault();
       ctxTarget = w;
@@ -919,6 +954,28 @@
     var a = document.createElement('a');
     a.href = url; a.download = 'poketicker-watchlist.csv'; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function showSparkTooltip(w, ev) {
+    if (!Array.isArray(w.daily) || w.daily.length < 2) { els.sparkTooltip.hidden = true; return; }
+    var last7 = w.daily.slice(-7);
+    var min = Infinity; var max = -Infinity;
+    last7.forEach(function (d) { if (d.p < min) min = d.p; if (d.p > max) max = d.p; });
+    var range = max - min || 1;
+    var html = '<div class="spark-title">7-day trend</div>';
+    html += '<div class="spark-bars">';
+    last7.forEach(function (d) {
+      var h = Math.round((d.p - min) / range * 40);
+      html += '<span class="spark-bar-wrap"><span class="spark-bar" style="height:' + h + 'px" title="' + d.d + ': ' + Poke.formatPrice(d.p) + '"></span></span>';
+    });
+    html += '</div>';
+    var first = last7[0]; var last = last7[last7.length - 1];
+    var chg = last.p - first.p;
+    html += '<div class="spark-summary">' + (chg >= 0 ? '+' : '') + Poke.formatPrice(chg) + ' over 7 days</div>';
+    els.sparkTooltip.innerHTML = html;
+    els.sparkTooltip.style.top = (ev.clientY - 90) + 'px';
+    els.sparkTooltip.style.left = Math.min(ev.clientX - 60, window.innerWidth - 170) + 'px';
+    els.sparkTooltip.hidden = false;
   }
 
   function updateRefreshAge() {
