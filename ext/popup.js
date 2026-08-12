@@ -2,6 +2,7 @@
 /* global Poke, chrome */
 
 (function () {
+  try { console.log('PokéTicker popup.js loaded'); } catch(_) {}
   var REFRESH_MS = 60 * 1000;
 
   var state = {
@@ -164,6 +165,7 @@
   function doSearch(query) {
     var q = query.trim();
     if (q.length < 2) { els.results.hidden = true; return; }
+    if (typeof Poke === 'undefined' || typeof Poke.fetchJson !== 'function') { setStatus('Module not loaded — reload the extension', true); return; }
     var myId = ++searchId;
     els.results.innerHTML = '<div class="res-note">Searching…</div>';
     els.results.hidden = false;
@@ -221,7 +223,13 @@
     if (ev.key === 'Enter') { doSearch(els.search.value); }
     if (ev.key === 'Escape') { els.results.hidden = true; }
   });
-  els.go.addEventListener('click', function () { doSearch(els.search.value); });
+  if (els.go) {
+    els.go.addEventListener('click', function () { doSearch(els.search.value); });
+  } else {
+    console.error('PokéTicker: #go button not found in DOM');
+  }
+  if (!els.search) console.error('PokéTicker: #search input not found in DOM');
+  else console.log('PokéTicker: search input found, listeners attached');
   document.addEventListener('click', function (ev) {
     if (!ev.target.closest('.search-wrap')) els.results.hidden = true;
   });
