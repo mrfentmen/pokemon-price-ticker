@@ -16,9 +16,6 @@
   "permissions": [
     "storage"
   ],
-  "host_permissions": [
-    "https://api.pokemontcg.io/*"
-  ],
   "optional_host_permissions": [
     "https://api.pokemontcg.io/*"
   ],

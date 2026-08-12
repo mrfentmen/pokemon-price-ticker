@@ -1100,11 +1100,5 @@
     }, 250);
   });
   health('READY', true);
-  // Proactively check/request API permission
-  chrome.permissions.contains({ origins: ['https://api.pokemontcg.io/*'] }, function(has) {
-    if (!has) {
-      setStatus('🔒 API access not granted — type anything to unlock', true);
-    }
-  });
   } catch(e) { health('ERROR: ' + (e.message || 'unknown'), false); console.error(e); }
 })();
