@@ -510,9 +510,19 @@
     row.appendChild(quote); row.appendChild(favBtn); row.appendChild(x);
     spark.className = 'inline-spark'; spark.width = 160; spark.height = 64;
     spark.title = 'Click to open price chart';
+    spark.tabIndex = 0;
+    spark.setAttribute('role', 'button');
+    spark.setAttribute('aria-label', 'Open interactive price chart for ' + w.name);
     spark.addEventListener('click', function (ev) {
       ev.stopPropagation();
-      openChartOverlay(w);
+      openChartOverlay(w, spark);
+    });
+    spark.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openChartOverlay(w, spark);
+      }
     });
 
     // ---- alert panel ----
@@ -810,6 +820,7 @@
     hintTimer = setTimeout(function () { setStatus(''); }, 1400);
   }
   document.addEventListener('keydown', function (ev) {
+    if (overlayEl && !overlayEl.hidden && overlayEl.contains(ev.target)) return;
     if (!ev.ctrlKey && !ev.metaKey) {
       if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
         ev.preventDefault();
@@ -941,15 +952,68 @@
   // ---------- chart overlay ----------
   var overlayCard = null;
   var overlayRange = '30d';
+  var overlayPointIndex = null;
+  var overlayTrigger = null;
   var overlayCanvas = document.getElementById('chartOverlayCanvas');
   var overlayEl = document.getElementById('chartOverlay');
+  var overlayTitle = document.getElementById('chartOverlayTitle');
+  var overlayMeta = document.getElementById('chartOverlayMeta');
+  var overlayClose = document.getElementById('chartOverlayClose');
 
-  function openChartOverlay(w) {
+  function overlayData() {
+    return overlayCard ? getChartData(overlayCard, overlayRange) : [];
+  }
+
+  function setOverlayHint() {
+    overlayMeta.textContent = 'Use Left/Right arrows to inspect prices; Home and End jump to the edges.';
+    if (overlayCard) {
+      overlayCanvas.setAttribute('aria-label', 'Interactive price chart for ' + overlayCard.name + '. Use the arrow keys to inspect daily prices.');
+    }
+  }
+
+  function selectOverlayPoint(index) {
+    var data = overlayData();
+    if (!data.length) {
+      overlayPointIndex = null;
+      drawChart(overlayCanvas, overlayCard, overlayRange);
+      overlayMeta.textContent = 'No price history is available for this range.';
+      return;
+    }
+    overlayPointIndex = Math.max(0, Math.min(data.length - 1, index));
+    var dp = data[overlayPointIndex];
+    drawChart(overlayCanvas, overlayCard, overlayRange, overlayPointIndex);
+    overlayMeta.textContent = 'Selected: ' + Poke.formatPrice(dp.p) + ' on ' + dp.d + ' — point ' + (overlayPointIndex + 1) + ' of ' + data.length;
+    overlayCanvas.setAttribute('aria-label', 'Price on ' + dp.d + ': ' + Poke.formatPrice(dp.p) + '. Point ' + (overlayPointIndex + 1) + ' of ' + data.length + '. Use Left or Right arrows to move.');
+  }
+
+  function getOverlayFocusables() {
+    return Array.prototype.slice.call(overlayEl.querySelectorAll('button:not([disabled]), canvas[tabindex]'));
+  }
+
+  function closeChartOverlay() {
+    if (overlayEl.hidden) return;
+    overlayEl.hidden = true;
+    overlayCard = null;
+    overlayPointIndex = null;
+    els.chartTooltip.hidden = true;
+    var trigger = overlayTrigger;
+    overlayTrigger = null;
+    if (trigger && typeof trigger.focus === 'function' && document.contains(trigger)) {
+      trigger.focus();
+    } else if (els.search && typeof els.search.focus === 'function') {
+      // A refresh or sort can rebuild the card row while the overlay is open.
+      els.search.focus();
+    }
+  }
+
+  function openChartOverlay(w, trigger) {
     overlayCard = w;
+    overlayTrigger = trigger || document.activeElement;
     overlayRange = cardRange[w.id] || '30d';
-    document.getElementById('chartOverlayTitle').textContent = w.name + ' · ' + Poke.formatPrice(w.price);
+    overlayPointIndex = null;
+    overlayTitle.textContent = w.name + ' · ' + Poke.formatPrice(w.price);
 
-    // Build range buttons
+    // Build range buttons.
     var tools = document.getElementById('chartOverlayTools');
     tools.innerHTML = '';
     ['7d', '30d', 'All'].forEach(function(rng) {
@@ -960,35 +1024,35 @@
       btn.addEventListener('click', function() {
         overlayRange = val;
         cardRange[w.id] = val;
-        tools.querySelectorAll('button').forEach(function(b){b.classList.remove('active');});
+        overlayPointIndex = null;
+        tools.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
         btn.classList.add('active');
+        setOverlayHint();
         redrawOverlay();
       });
       tools.appendChild(btn);
     });
 
-    // Meta
-    var meta = document.getElementById('chartOverlayMeta');
-    meta.innerHTML = 'Click the line to see exact prices';
-
+    setOverlayHint();
     overlayEl.hidden = false;
     overlayCanvas.width = overlayEl.querySelector('.chart-overlay-inner').offsetWidth - 24;
     overlayCanvas.height = 220;
     redrawOverlay();
+    setTimeout(function() { overlayClose.focus(); }, 0);
   }
 
   function redrawOverlay() {
     if (!overlayCard) return;
-    drawChart(overlayCanvas, overlayCard, overlayRange);
+    drawChart(overlayCanvas, overlayCard, overlayRange, overlayPointIndex);
   }
 
-  // Overlay hover
+  // Mouse hover and keyboard selection share the same selected point renderer.
   overlayCanvas.addEventListener('mousemove', function(ev) {
     if (!overlayCard) return;
     var rect = overlayCanvas.getBoundingClientRect();
     var mx = ev.clientX - rect.left;
     var scaleX = overlayCanvas.width / rect.width;
-    var data = getChartData(overlayCard, overlayRange);
+    var data = overlayData();
     if (!data.length) return;
     var pad = { left: 52, right: 14 };
     var pw = overlayCanvas.width - pad.left - pad.right;
@@ -998,33 +1062,74 @@
       var dist = Math.abs(mx * scaleX - sx);
       if (dist < bestDist) { bestDist = dist; nearest = di; }
     }
-    if (bestDist > 35) { nearest = null; els.chartTooltip.hidden = true; }
-    drawChart(overlayCanvas, overlayCard, overlayRange, nearest);
-    if (nearest != null) {
-      var dp = data[nearest];
-      els.chartTooltip.textContent = dp.d + ' — $' + dp.p.toFixed(2);
-      els.chartTooltip.style.left = ev.clientX + 'px';
-      els.chartTooltip.style.top = (ev.clientY - 14) + 'px';
-      els.chartTooltip.hidden = false;
-      document.getElementById('chartOverlayMeta').textContent = 'Selected: ' + dp.p.toFixed(2) + ' on ' + dp.d;
+    if (bestDist > 35) {
+      overlayPointIndex = null;
+      els.chartTooltip.hidden = true;
+      redrawOverlay();
+      setOverlayHint();
+      return;
     }
+    overlayPointIndex = nearest;
+    selectOverlayPoint(nearest);
+    var dp = data[nearest];
+    els.chartTooltip.textContent = dp.d + ' — ' + Poke.formatPrice(dp.p);
+    els.chartTooltip.style.left = ev.clientX + 'px';
+    els.chartTooltip.style.top = (ev.clientY - 14) + 'px';
+    els.chartTooltip.hidden = false;
   });
   overlayCanvas.addEventListener('mouseleave', function() {
-    if (overlayCard) drawChart(overlayCanvas, overlayCard, overlayRange);
+    if (overlayCard) {
+      overlayPointIndex = null;
+      redrawOverlay();
+    }
     els.chartTooltip.hidden = true;
-    document.getElementById('chartOverlayMeta').textContent = 'Click the line to see exact prices';
+    if (overlayCard) setOverlayHint();
+  });
+  overlayCanvas.addEventListener('keydown', function(ev) {
+    if (!overlayCard) return;
+    var data = overlayData();
+    if (!data.length) return;
+    var next = overlayPointIndex;
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') next = next == null ? 0 : next + 1;
+    else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') next = next == null ? data.length - 1 : next - 1;
+    else if (ev.key === 'Home') next = 0;
+    else if (ev.key === 'End') next = data.length - 1;
+    else return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    selectOverlayPoint(next);
   });
 
-  // Close overlay
-  document.getElementById('chartOverlayClose').addEventListener('click', function() {
-    overlayEl.hidden = true; overlayCard = null;
-  });
+  // Close overlay and restore focus to the sparkline that opened it.
+  overlayClose.addEventListener('click', closeChartOverlay);
   overlayEl.addEventListener('click', function(ev) {
-    if (ev.target === overlayEl) { overlayEl.hidden = true; overlayCard = null; }
+    if (ev.target === overlayEl) closeChartOverlay();
   });
   document.addEventListener('keydown', function(ev) {
-    if (ev.key === 'Escape' && !overlayEl.hidden) {
-      overlayEl.hidden = true; overlayCard = null;
+    if (overlayEl.hidden) return;
+    if (ev.key === 'Escape') {
+      ev.preventDefault();
+      closeChartOverlay();
+      return;
+    }
+    if (ev.key !== 'Tab') return;
+    var focusables = getOverlayFocusables();
+    if (!focusables.length) {
+      ev.preventDefault();
+      overlayEl.focus();
+      return;
+    }
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (!overlayEl.contains(document.activeElement)) {
+      ev.preventDefault();
+      first.focus();
+    } else if (ev.shiftKey && document.activeElement === first) {
+      ev.preventDefault();
+      last.focus();
+    } else if (!ev.shiftKey && document.activeElement === last) {
+      ev.preventDefault();
+      first.focus();
     }
   });
 

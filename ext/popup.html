@@ -71,15 +71,15 @@
   <div id="chartTooltip" class="chart-tooltip" hidden></div>
 
   <!-- chart overlay -->
-  <div id="chartOverlay" class="chart-overlay" hidden>
+  <div id="chartOverlay" class="chart-overlay" role="dialog" aria-modal="true" aria-labelledby="chartOverlayTitle" aria-describedby="chartOverlayMeta" tabindex="-1" hidden>
     <div class="chart-overlay-inner">
       <div class="chart-overlay-head">
         <span id="chartOverlayTitle">Price Chart</span>
-        <button id="chartOverlayClose" class="overlay-close" type="button">✕</button>
+        <button id="chartOverlayClose" class="overlay-close" type="button" aria-label="Close price chart">✕</button>
       </div>
-      <div class="chart-overlay-tools" id="chartOverlayTools"></div>
-      <canvas id="chartOverlayCanvas"></canvas>
-      <div class="chart-overlay-meta" id="chartOverlayMeta"></div>
+      <div class="chart-overlay-tools" id="chartOverlayTools" role="group" aria-label="Chart time range"></div>
+      <canvas id="chartOverlayCanvas" tabindex="0" role="img" aria-describedby="chartOverlayMeta"></canvas>
+      <div class="chart-overlay-meta" id="chartOverlayMeta" role="status" aria-live="polite">Use the arrow keys on the chart to inspect prices.</div>
     </div>
   </div>
 

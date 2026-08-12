@@ -440,6 +440,12 @@ body.light .card-thumb.ph { border-color: #333; }
   display: flex; align-items: center; justify-content: center;
 }
 .overlay-close:hover { background: var(--down); color: #fff; border-color: var(--down); }
+.overlay-close:focus-visible,
+.chart-overlay-tools button:focus-visible,
+#chartOverlayCanvas:focus-visible,
+.inline-spark:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
 .chart-overlay-tools {
   display: flex; gap: 5px; margin-bottom: 6px; justify-content: center;
 }
@@ -452,6 +458,7 @@ body.light .card-thumb.ph { border-color: #333; }
 #chartOverlayCanvas {
   display: block; width: 100%;
   background: var(--card); border: 1px solid var(--border); border-radius: 9px;
+  cursor: crosshair;
 }
 .chart-overlay-meta {
   display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
