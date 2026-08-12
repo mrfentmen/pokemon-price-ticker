@@ -25,7 +25,7 @@ body {
 .app-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; }
 .logo {
   width: 38px; height: 38px; border-radius: 50%;
-  background: conic-gradient(from 180deg, #ef4444 0% 50%, #ffffff 50% 100%);
+  background: linear-gradient(to bottom, #ef4444 0% 50%, #ffffff 50% 100%);
   position: relative; flex: none;
   box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5);
 }
@@ -179,7 +179,7 @@ body {
 .card-thumb.ph {
   display: flex; align-items: center; justify-content: center;
   width: 36px; height: 36px; border-radius: 50%;
-  background: conic-gradient(from 180deg, #ef4444 0% 50%, #ffffff 50% 100%);
+  background: linear-gradient(to bottom, #ef4444 0% 50%, #ffffff 50% 100%);
   position: relative; border: 1.5px solid #1a1a2e;
   flex: none;
 }
@@ -226,23 +226,23 @@ body {
   background: var(--card2);
   max-height: 0; overflow: hidden;
   transition: max-height 0.3s ease, padding 0.3s ease;
-  padding: 0 10px;
+  padding: 0 14px;
 }
 .card-expand.open {
-  max-height: 500px;
-  padding: 10px;
+  max-height: 580px;
+  padding: 14px;
 }
 
 .expand-top {
-  display: flex; gap: 12px; align-items: flex-start;
+  display: flex; gap: 14px; align-items: flex-start;
 }
 .expand-thumb {
-  width: 80px; height: 110px; object-fit: cover; border-radius: 6px;
+  width: 94px; height: 130px; object-fit: cover; border-radius: 7px;
   flex: none; background: var(--card);
 }
 .expand-thumb.ph {
-  width: 60px; height: 60px; border-radius: 50%;
-  background: conic-gradient(from 180deg, #ef4444 0% 50%, #ffffff 50% 100%);
+  width: 70px; height: 70px; border-radius: 50%;
+  background: linear-gradient(to bottom, #ef4444 0% 50%, #ffffff 50% 100%);
   position: relative; border: 2px solid #1a1a2e; display: block;
 }
 .expand-thumb.ph::before {
@@ -255,12 +255,12 @@ body {
   background: #fff; border: 2px solid #1a1a2e;
 }
 
-.expand-details { flex: 1; min-width: 0; font-size: 11px; line-height: 1.6; color: var(--text); }
-.expand-details .det-name { font-size: 13px; font-weight: 800; margin-bottom: 2px; }
-.expand-details .det-set { font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
+.expand-details { flex: 1; min-width: 0; line-height: 1.6; color: var(--text); }
+.expand-details .det-name { font-size: 15px; font-weight: 800; margin-bottom: 3px; }
+.expand-details .det-set { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
 .expand-detail-row {
-  display: flex; gap: 10px; flex-wrap: wrap;
-  font-size: 10.5px; font-variant-numeric: tabular-nums; margin-bottom: 2px;
+  display: flex; gap: 12px; flex-wrap: wrap;
+  font-size: 12px; font-variant-numeric: tabular-nums; margin-bottom: 4px;
 }
 .expand-detail-row span { white-space: nowrap; }
 .det-up { color: var(--up); font-weight: 700; }
@@ -269,15 +269,15 @@ body {
 .expand-bottom { margin-top: 8px; }
 
 /* ---------- chart section ---------- */
-.chart-section { margin-top: 10px; }
+.chart-section { margin-top: 12px; }
 .chart-tools {
-  display: flex; gap: 4px; margin-bottom: 6px;
+  display: flex; gap: 5px; margin-bottom: 8px;
 }
 .chart-tools button {
-  padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px;
-  background: var(--card); color: var(--muted); font-size: 10.5px; cursor: pointer;
+  padding: 5px 14px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--card); color: var(--muted); font-size: 12px; cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-  font-weight: 600;
+  font-weight: 700;
 }
 .chart-tools button:hover { border-color: var(--accent); color: var(--text); }
 .chart-tools button.active {
@@ -285,24 +285,23 @@ body {
 }
 
 .price-chart {
-  display: block; width: 100%; height: 160px;
+  display: block; width: 100%; height: 200px;
   background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-  image-rendering: auto;
 }
 
 .chart-legend {
-  display: flex; gap: 14px; margin-top: 4px; font-size: 9.5px; color: var(--muted);
+  display: flex; gap: 14px; margin-top: 4px; font-size: 11px; color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 .chart-legend span { font-weight: 700; }
 
 /* ---------- expand actions ---------- */
 .expand-actions {
-  display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap;
+  display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap;
 }
 .expand-actions .btn-sm {
-  padding: 3px 9px; border: 1px solid var(--border); border-radius: 6px;
-  background: var(--card); color: var(--text); font-size: 10.5px; cursor: pointer;
+  padding: 5px 12px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--card); color: var(--text); font-size: 12px; cursor: pointer;
   transition: background 0.12s ease;
   font-weight: 600;
 }
@@ -391,10 +390,10 @@ body.compact .card-price { font-size: 12px; }
 body.compact .card-variant { font-size: 6px; }
 body.compact .card-trend { font-size: 9.5px; }
 body.compact .expand-chevron { width: 18px; height: 18px; font-size: 11px; }
-body.compact .card-expand.open { max-height: 420px; padding: 7px; }
-body.compact .expand-thumb { width: 56px; height: 78px; }
-body.compact .expand-thumb.ph { width: 40px; height: 40px; }
-body.compact .price-chart { height: 120px; }
+body.compact .card-expand.open { max-height: 480px; padding: 9px; }
+body.compact .expand-thumb { width: 62px; height: 86px; }
+body.compact .expand-thumb.ph { width: 46px; height: 46px; }
+body.compact .price-chart { height: 160px; }
 
 .empty { margin: 22px 16px; text-align: center; color: var(--muted); font-size: 12.5px; }
 

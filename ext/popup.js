@@ -525,7 +525,7 @@
     });
     chartSec.appendChild(chartTools);
     var canvas = document.createElement('canvas');
-    canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 160;
+    canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 200;
     chartSec.appendChild(canvas);
     if (isExpanded) {
       requestAnimationFrame(function () { drawChart(canvas, w, expandedRange[w.id] || '30d'); });
@@ -1007,7 +1007,7 @@
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, W, H);
 
-    var pad = { top: 16, right: 12, bottom: 24, left: 48 };
+    var pad = { top: 20, right: 14, bottom: 28, left: 52 };
     var pw = W - pad.left - pad.right;
     var ph = H - pad.top - pad.bottom;
 
@@ -1022,14 +1022,14 @@
     function y(p) { return pad.top + (1 - (p - min) / yr) * ph; }
 
     // grid lines
-    ctx.strokeStyle = '#1e2c4d'; ctx.lineWidth = 0.5;
+    ctx.strokeStyle = '#2a3a5c'; ctx.lineWidth = 0.5;
     var steps = 4;
     for (var g = 0; g <= steps; g++) {
       var gVal = min + (yr * g / steps);
       var gy = y(gVal);
       ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(W - pad.right, gy); ctx.stroke();
-      ctx.fillStyle = '#8fa1c7'; ctx.font = '9px -apple-system, sans-serif';
-      ctx.textAlign = 'right'; ctx.fillText('$' + gVal.toFixed(0), pad.left - 5, gy + 3);
+      ctx.fillStyle = '#b0bfdb'; ctx.font = 'bold 10px -apple-system, sans-serif';
+      ctx.textAlign = 'right'; ctx.fillText('$' + gVal.toFixed(0), pad.left - 6, gy + 4);
     }
 
     // gradient fill
@@ -1045,7 +1045,7 @@
     ctx.closePath(); ctx.fill();
 
     // line
-    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(x(0), y(prices[0]));
     for (var j = 1; j < data.length; j++) { ctx.lineTo(x(j), y(prices[j])); }
@@ -1060,11 +1060,11 @@
     }
 
     // date labels
-    ctx.fillStyle = '#8fa1c7'; ctx.font = '8px -apple-system, sans-serif'; ctx.textAlign = 'center';
-    var labelCount = Math.min(5, data.length);
+    ctx.fillStyle = '#b0bfdb'; ctx.font = 'bold 10px -apple-system, sans-serif'; ctx.textAlign = 'center';
+    var labelCount = Math.min(6, data.length);
     for (var l = 0; l < labelCount; l++) {
       var idx = Math.floor(l * (data.length - 1) / Math.max(1, labelCount - 1));
-      ctx.fillText(data[idx].d.slice(5), x(idx), H - 6);
+      ctx.fillText(data[idx].d.slice(5), x(idx), H - 8);
     }
   }
 
