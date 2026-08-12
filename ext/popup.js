@@ -501,12 +501,11 @@
     x.title = 'Remove from ticker'; x.textContent = '✕';
     x.addEventListener('click', function (ev) { ev.stopPropagation(); removeCard(w.id); });
 
+    // ---- inline sparkline ----
+    var spark = document.createElement('canvas');
     row.appendChild(grip); row.appendChild(thumb); row.appendChild(info);
     row.appendChild(spark);
     row.appendChild(quote); row.appendChild(favBtn); row.appendChild(x);
-
-    // ---- inline sparkline ----
-    var spark = document.createElement('canvas');
     spark.className = 'inline-spark'; spark.width = 160; spark.height = 64;
     spark.title = 'Click to open price chart';
     spark.addEventListener('click', function (ev) {
