@@ -174,3 +174,14 @@ body {
   flex: 1 1 auto; min-width: 0; font-size: 9px; color: var(--muted);
   text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* ---------- retry ---------- */
+.status-row { display: flex; align-items: center; margin: 8px 16px 0; }
+.status-row .status { margin: 0; flex: 1; }
+.retry-btn {
+  flex: none; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--card); color: var(--accent);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.retry-btn:hover { background: var(--card2); transform: translateY(-1px); }
