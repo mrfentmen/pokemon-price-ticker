@@ -87,6 +87,15 @@ body {
 .search-wrap .btn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(56, 189, 248, 0.35); }
 .search-wrap .btn:active { transform: scale(0.95); }
 
+.recent-searches { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; min-height: 0; }
+.recent-chip {
+  padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--card); color: var(--muted);
+  font-size: 10px; cursor: pointer; white-space: nowrap;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.recent-chip:hover { border-color: var(--accent); color: var(--accent); }
+
 .results {
   position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 50;
   background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
@@ -111,6 +120,9 @@ body {
 .list-head { display: flex; align-items: center; justify-content: space-between; margin: 12px 16px 6px; flex-wrap: wrap; gap: 4px; }
 .list-title { font-size: 10px; font-weight: 800; letter-spacing: 0.9px; text-transform: uppercase; color: var(--muted); }
 .portfolio { font-size: 11px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; margin-left: auto; margin-right: 8px; }
+.portfolio-day { font-size: 10px; font-weight: 800; }
+.portfolio-day.up { color: var(--up); }
+.portfolio-day.down { color: var(--down); }
 .sort-select {
   padding: 2px 6px; border: 1px solid var(--border); border-radius: 5px;
   background: var(--card); color: var(--muted); font-size: 10px; cursor: pointer; outline: none;
@@ -203,6 +215,7 @@ body.compact .card-bars .bar { width: 0.8px; }
 body.compact .alert-btn { width: 20px; height: 20px; font-size: 10px; }
 body.compact .row-x { width: 18px; height: 18px; }
 body.compact .drag-grip { width: 8px; font-size: 9px; }
+body.compact .card-row { padding-left: 5px !important; }
 
 .empty { margin: 22px 16px; text-align: center; color: var(--muted); font-size: 12.5px; }
 
