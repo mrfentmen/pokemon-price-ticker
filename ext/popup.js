@@ -390,7 +390,7 @@
 
     // if the previously expanded card still exists, draw its chart
     if (expandedId) {
-      requestAnimationFrame(function () {
+      setTimeout(function () {
         var wrap = els.list.querySelector('.card-wrap.expanded');
         if (wrap) {
           var canvas = wrap.querySelector('.price-chart');
@@ -406,7 +406,7 @@
             }
           }
         }
-      });
+      }, 400);
     }
   }
 
@@ -528,7 +528,14 @@
     canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 200;
     chartSec.appendChild(canvas);
     if (isExpanded) {
-      requestAnimationFrame(function () { drawChart(canvas, w, expandedRange[w.id] || '30d'); });
+      expand.addEventListener('transitionend', function drawOnOpen() {
+        expand.removeEventListener('transitionend', drawOnOpen);
+        drawChart(canvas, w, expandedRange[w.id] || '30d');
+      });
+      // fallback: draw after 400ms even if transitionend doesn't fire
+      setTimeout(function () {
+        if (expand.classList.contains('open')) drawChart(canvas, w, expandedRange[w.id] || '30d');
+      }, 400);
     }
 
     // expand bottom: sparkline + posbar
