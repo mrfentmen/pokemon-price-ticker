@@ -148,6 +148,22 @@ body {
 .card-daychg.up { color: var(--up); }
 .card-daychg.down { color: var(--down); }
 .card-range { font-size: 8.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 1px; }
+.card-posbar {
+  width: 100%; height: 2px; background: var(--border); border-radius: 1px; margin-top: 3px;
+}
+.card-posfill {
+  height: 100%; border-radius: 1px;
+  background: linear-gradient(90deg, var(--down), var(--warn), var(--up));
+}
+
+/* ---------- favorite ---------- */
+.fav-btn {
+  flex: none; width: 22px; height: 22px; border: 0; border-radius: 5px;
+  background: transparent; font-size: 11px; cursor: pointer; opacity: 0.35;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.fav-btn:hover, .fav-btn.fav-on { opacity: 1; }
+.fav-btn.fav-on:hover { transform: scale(1.15); }
 .card-bars { display: flex; align-items: flex-end; gap: 0.5px; height: 18px; flex: none; }
 .card-bars .bar { width: 1px; border-radius: 0; background: var(--accent); opacity: 0.75; }
 .row-x {
@@ -179,6 +195,8 @@ body.compact .card-variant { font-size: 6.5px; }
 body.compact .card-trend { font-size: 9.5px; }
 body.compact .card-daychg { font-size: 8.5px; }
 body.compact .card-range { font-size: 7.5px; }
+body.compact .card-posbar { height: 1.5px; }
+body.compact .fav-btn { width: 16px; height: 16px; font-size: 9px; }
 body.compact .card-bars { height: 12px; }
 body.compact .card-bars .bar { width: 0.8px; }
 body.compact .alert-btn { width: 20px; height: 20px; font-size: 10px; }
@@ -317,3 +335,19 @@ body.light {
 .alert-log-dir { color: var(--accent2); font-weight: 700; white-space: nowrap; }
 .alert-log-price { color: var(--text); font-weight: 800; white-space: nowrap; }
 .alert-log-time { color: var(--muted); font-size: 10px; margin-left: auto; white-space: nowrap; }
+
+/* ---------- right-click context menu ---------- */
+.ctx-menu {
+  position: fixed; z-index: 100;
+  background: var(--card2); border: 1px solid var(--border); border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5); overflow: hidden; min-width: 130px;
+}
+.ctx-menu[hidden] { display: none; }
+.ctx-item {
+  display: block; width: 100%; padding: 6px 12px; border: 0; border-bottom: 1px solid var(--border);
+  background: transparent; color: var(--text); font: inherit; font-size: 11.5px; text-align: left; cursor: pointer;
+}
+.ctx-item:last-child { border-bottom: 0; }
+.ctx-item:hover { background: rgba(56, 189, 248, 0.15); }
+.ctx-danger { color: var(--down); }
+.ctx-danger:hover { background: rgba(248, 113, 113, 0.15); }

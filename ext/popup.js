@@ -28,8 +28,11 @@
     exportCsv: document.getElementById('exportCsv'),
     copyClip: document.getElementById('copyClip'),
     compactToggle: document.getElementById('compactToggle'),
-    themeToggle: document.getElementById('themeToggle')
+    themeToggle: document.getElementById('themeToggle'),
+    ctxMenu: document.getElementById('ctxMenu')
   };
+
+  var ctxTarget = null;
 
   var dragIdx = -1;
   var compact = false;
@@ -332,14 +335,18 @@
     var sum = 0; var priced = 0;
     state.watch.forEach(function (w) { if (w.price != null) { sum += w.price; priced++; } });
     els.portfolio.textContent = priced ? 'Total: $' + sum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' (' + priced + ' cards)' : '';
-    // sort
+    // sort — favorites always on top, then sort within each group
     var sort = els.sortBy.value;
     var sorted = state.watch.slice();
-    if (sort === 'name') sorted.sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
-    else if (sort === 'price-desc') sorted.sort(function (a, b) { return (b.price || 0) - (a.price || 0); });
-    else if (sort === 'price-asc') sorted.sort(function (a, b) { return (a.price || 0) - (b.price || 0); });
-    else if (sort === 'trend-desc') sorted.sort(function (a, b) { var ta = a.trend ? a.trend.pct : 0; var tb = b.trend ? b.trend.pct : 0; return tb - ta; });
-    else if (sort === 'trend-asc') sorted.sort(function (a, b) { var ta = a.trend ? a.trend.pct : 0; var tb = b.trend ? b.trend.pct : 0; return ta - tb; });
+    sorted.sort(function (a, b) { return (b.fav ? 1 : 0) - (a.fav ? 1 : 0); });
+    var favs = sorted.filter(function (w) { return w.fav; });
+    var rest = sorted.filter(function (w) { return !w.fav; });
+    if (sort === 'name') rest.sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    else if (sort === 'price-desc') rest.sort(function (a, b) { return (b.price || 0) - (a.price || 0); });
+    else if (sort === 'price-asc') rest.sort(function (a, b) { return (a.price || 0) - (b.price || 0); });
+    else if (sort === 'trend-desc') rest.sort(function (a, b) { var ta = a.trend ? a.trend.pct : 0; var tb = b.trend ? b.trend.pct : 0; return tb - ta; });
+    else if (sort === 'trend-asc') rest.sort(function (a, b) { var ta = a.trend ? a.trend.pct : 0; var tb = b.trend ? b.trend.pct : 0; return ta - tb; });
+    sorted = favs.concat(rest);
     els.list.innerHTML = '';
     sorted.forEach(function (w) {
       els.list.appendChild(rowFor(w));
@@ -410,6 +417,18 @@
       quote.appendChild(range);
     }
 
+    // ---- price position bar ----
+    if (ath != null && atl != null && ath !== atl && w.price != null) {
+      var pct = Math.max(0, Math.min(100, (w.price - atl) / (ath - atl) * 100));
+      var posBar = document.createElement('div');
+      posBar.className = 'card-posbar';
+      var fill = document.createElement('div');
+      fill.className = 'card-posfill';
+      fill.style.width = pct + '%';
+      posBar.appendChild(fill);
+      quote.appendChild(posBar);
+    }
+
     var bars = document.createElement('div');
     bars.className = 'card-bars';
     bars.title = '30-day price sparkline';
@@ -465,6 +484,25 @@
       alertBtn.classList.add('alert-off');
     }
     alertBtn.textContent = '🔔';
+    row.appendChild(alertBtn);
+
+    // ---- ⭐ favorite toggle ----
+    var favBtn = document.createElement('button');
+    favBtn.className = 'fav-btn' + (w.fav ? ' fav-on' : '');
+    favBtn.type = 'button';
+    favBtn.title = w.fav ? 'Unpin from top' : 'Pin to top';
+    favBtn.textContent = w.fav ? '⭐' : '☆';
+    favBtn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      w.fav = !w.fav;
+      favBtn.textContent = w.fav ? '⭐' : '☆';
+      favBtn.classList.toggle('fav-on', w.fav);
+      favBtn.title = w.fav ? 'Unpin from top' : 'Pin to top';
+      save();
+      render();
+    });
+    row.appendChild(favBtn);
+
     row.appendChild(alertBtn);
 
     var panel = document.createElement('div');
@@ -541,8 +579,15 @@
     wrap.appendChild(row);
     wrap.appendChild(panel);
 
+    row.addEventListener('contextmenu', function (ev) {
+      ev.preventDefault();
+      ctxTarget = w;
+      els.ctxMenu.style.top = Math.min(ev.clientY, window.innerHeight - 120) + 'px';
+      els.ctxMenu.style.left = Math.min(ev.clientX, window.innerWidth - 130) + 'px';
+      els.ctxMenu.hidden = false;
+    });
     row.addEventListener('click', function (ev) {
-      if (ev.target.closest('.drag-grip') || ev.target.closest('.alert-btn') || ev.target.closest('.row-x')) return;
+      if (ev.target.closest('.drag-grip') || ev.target.closest('.alert-btn') || ev.target.closest('.row-x') || ev.target.closest('.fav-btn')) return;
       if (w.tcgplayerUrl) chrome.windows.create({ type: 'popup', url: w.tcgplayerUrl, width: 900, height: 700 });
     });
     row.addEventListener('keydown', function (ev) {
@@ -734,6 +779,23 @@
     setStatus('Cleared your ticker');
     render();
   });
+
+  // ---------- right-click context menu ----------
+  document.addEventListener('click', function () { els.ctxMenu.hidden = true; });
+  els.ctxMenu.addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    var action = (ev.target.closest('[data-action]') || {}).dataset && ev.target.closest('[data-action]').dataset.action;
+    if (!action || !ctxTarget) return;
+    var w = ctxTarget;
+    if (action === 'copy-price') navigator.clipboard.writeText(Poke.formatPrice(w.price));
+    else if (action === 'copy-name') navigator.clipboard.writeText(w.name);
+    else if (action === 'remove') removeCard(w.id);
+    els.ctxMenu.hidden = true;
+    ctxTarget = null;
+  });
+
+  // Add right-click to card rows (delegated via the render function adding listeners)
+  // The contextmenu listener is added in rowFor below
 
   // ---------- keyboard page zoom (family pattern) ----------
   function applyPageZoom(z) {
