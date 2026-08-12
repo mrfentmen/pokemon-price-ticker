@@ -153,6 +153,32 @@ body {
 }
 .row-x:hover { background: rgba(248, 113, 113, 0.18); color: var(--down); }
 
+/* ---------- drag grip ---------- */
+.drag-grip {
+  flex: none; width: 12px; cursor: grab; color: var(--muted);
+  font-size: 11px; letter-spacing: -2px; line-height: 1; user-select: none;
+  opacity: 0.4; transition: opacity 0.12s ease;
+}
+.card-row:hover .drag-grip { opacity: 1; }
+.drag-grip:active { cursor: grabbing; }
+.card-row.dragging { opacity: 0.4; }
+.drag-over { border-top: 2px solid var(--accent) !important; }
+
+/* ---------- compact view ---------- */
+body.compact .card-row { padding: 4px 8px; margin-bottom: 4px; gap: 6px; border-radius: 8px; }
+body.compact .card-thumb { width: 32px; height: 44px; }
+body.compact .card-info { gap: 0; }
+body.compact .card-name { font-size: 11px; }
+body.compact .card-set { font-size: 9.5px; }
+body.compact .card-price { font-size: 12px; }
+body.compact .card-variant { font-size: 6.5px; }
+body.compact .card-trend { font-size: 9.5px; }
+body.compact .card-bars { height: 12px; }
+body.compact .card-bars .bar { width: 0.8px; }
+body.compact .alert-btn { width: 20px; height: 20px; font-size: 10px; }
+body.compact .row-x { width: 18px; height: 18px; }
+body.compact .drag-grip { width: 8px; font-size: 9px; }
+
 .empty { margin: 22px 16px; text-align: center; color: var(--muted); font-size: 12.5px; }
 
 /* ---------- status ---------- */
