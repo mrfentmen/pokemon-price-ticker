@@ -417,12 +417,12 @@
     wrap.appendChild(panel);
 
     row.addEventListener('click', function () {
-      if (w.tcgplayerUrl) chrome.tabs.create({ url: w.tcgplayerUrl });
+      if (w.tcgplayerUrl) chrome.windows.create({ type: 'popup', url: w.tcgplayerUrl, width: 900, height: 700 });
     });
     row.addEventListener('keydown', function (ev) {
       if (ev.key === 'Enter' || ev.key === ' ') {
         ev.preventDefault();
-        if (w.tcgplayerUrl) chrome.tabs.create({ url: w.tcgplayerUrl });
+        if (w.tcgplayerUrl) chrome.windows.create({ type: 'popup', url: w.tcgplayerUrl, width: 900, height: 700 });
       }
     });
     return wrap;
