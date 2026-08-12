@@ -283,7 +283,7 @@ body {
 }
 
 .price-chart {
-  display: block; width: 100%; height: 200px;
+  display: block; height: 200px;
   background: var(--card); border: 1px solid var(--border); border-radius: 8px;
 }
 

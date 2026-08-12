@@ -388,25 +388,23 @@
       els.list.appendChild(rowFor(w));
     });
 
-    // if the previously expanded card still exists, draw its chart
+    // draw chart synchronously — DOM is fully populated now
     if (expandedId) {
-      requestAnimationFrame(function () {
-        var wrap = els.list.querySelector('.card-wrap.expanded');
-        if (wrap) {
-          var canvas = wrap.querySelector('.price-chart');
-          var w = state.watch.find(function (x) { return x.id === expandedId; });
-          if (canvas && w) {
-            var range = expandedRange[expandedId] || '30d';
-            drawChart(canvas, w, range);
-            var tools = wrap.querySelector('.chart-tools');
-            if (tools) {
-              tools.querySelectorAll('button').forEach(function (b) {
-                b.classList.toggle('active', b.textContent.trim() === (range === '7d' ? '7d' : range === '30d' ? '30d' : 'All'));
-              });
-            }
+      var chartWrap = els.list.querySelector('.card-wrap.expanded');
+      if (chartWrap) {
+        var chartCanvas = chartWrap.querySelector('.price-chart');
+        var chartW = state.watch.find(function (x) { return x.id === expandedId; });
+        if (chartCanvas && chartW) {
+          var chartRange = expandedRange[expandedId] || '30d';
+          drawChart(chartCanvas, chartW, chartRange);
+          var chartTools = chartWrap.querySelector('.chart-tools');
+          if (chartTools) {
+            chartTools.querySelectorAll('button').forEach(function (b) {
+              b.classList.toggle('active', b.textContent.trim() === (chartRange === '7d' ? '7d' : chartRange === '30d' ? '30d' : 'All'));
+            });
           }
         }
-      });
+      }
     }
   }
 
@@ -527,11 +525,7 @@
     var canvas = document.createElement('canvas');
     canvas.className = 'price-chart'; canvas.width = 408; canvas.height = 200;
     chartSec.appendChild(canvas);
-    if (isExpanded) {
-      requestAnimationFrame(function () {
-        drawChart(canvas, w, expandedRange[w.id] || '30d');
-      });
-    }
+    // Chart drawn synchronously in render() after DOM append — skip here
 
     // expand bottom: sparkline + posbar
     var expandBottom = document.createElement('div'); expandBottom.className = 'expand-bottom';
@@ -1004,9 +998,16 @@
 
   function drawChart(canvas, w, range) {
     var data = getChartData(w, range);
-    if (!data.length) { var ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
-    var W = canvas.width; var H = canvas.height;
     var ctx = canvas.getContext('2d');
+    if (!data.length) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#8fa1c7';
+      ctx.font = '14px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Not enough price history yet — check back tomorrow', canvas.width / 2, canvas.height / 2);
+      return;
+    }
+    var W = canvas.width; var H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
     var pad = { top: 20, right: 14, bottom: 28, left: 52 };
