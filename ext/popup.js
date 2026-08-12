@@ -2,7 +2,12 @@
 /* global Poke, chrome */
 
 (function () {
-  try { console.log('PokéTicker popup.js loaded'); } catch(_) {}
+  try { console.log('PokeTicker popup.js loaded'); } catch(_) {}
+  var healthEl = document.getElementById('health');
+  function health(msg, ok) {
+    if (healthEl) { healthEl.textContent = msg; healthEl.style.color = ok ? '#4ade80' : '#f87171'; }
+  }
+  health('init...', false);
   var REFRESH_MS = 60 * 1000;
 
   var state = {
@@ -1059,6 +1064,10 @@
   }
 
   // ---------- init ----------
+  try {
+  health('checking Poke...', false);
+  if (typeof Poke === 'undefined') { health('POKE MISSING', false); throw new Error('Poke not loaded'); }
+  health('Poke OK, init...', false);
   chrome.action.setBadgeText({ text: '' });
   applyTheme();
   applyCompact();
@@ -1077,4 +1086,6 @@
       els.refresh.classList.add('refreshing');
     }, 250);
   });
+  health('READY', true);
+  } catch(e) { health('ERROR: ' + (e.message || 'unknown'), false); console.error(e); }
 })();
