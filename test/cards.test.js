@@ -24,7 +24,7 @@ const CHARIZARD = {
 
 test('searchUrl quotes the name and orders by newest set', () => {
   const u = Poke.searchUrl('charizard');
-  assert.ok(u.startsWith('https://api.pokemontcg.io/v2/cards?q=name:' + encodeURIComponent('"charizard"')));
+  assert.ok(u.startsWith('https://api.pokemontcg.io/v2/cards?q=name:' + encodeURIComponent('charizard*')));
   assert.ok(u.includes('pageSize=8'));
   assert.ok(u.includes('orderBy=-set.releaseDate'));
 });

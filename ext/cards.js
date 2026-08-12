@@ -12,7 +12,7 @@
   var UA = 'PokeTicker/1.0 (https://github.com/mrfentmen/pokemon-price-ticker; contactae2000@gmail.com)';
 
   function searchUrl(query, pageSize) {
-    return API + '/cards?q=name:' + encodeURIComponent('"' + query + '"') +
+    return API + '/cards?q=name:' + encodeURIComponent(query + '*') +
       '&pageSize=' + (pageSize || 8) + '&orderBy=-set.releaseDate';
   }
 

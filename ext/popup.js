@@ -183,8 +183,9 @@
       })
       .catch(function (err) {
         if (myId !== searchId) return;
-        console.error('doSearch error:', err);
-        els.results.innerHTML = '<div class="res-note"><strong>Fetch error:</strong> ' + esc(err.message || 'unknown') + '</div>';
+        var msg = (err && err.status === 404) ? 'No cards found for "' + esc(q) + '".'
+          : 'The price feed is hiccuping — try again in a moment.';
+        els.results.innerHTML = '<div class="res-note">' + msg + '</div>';
       });
   }
 
